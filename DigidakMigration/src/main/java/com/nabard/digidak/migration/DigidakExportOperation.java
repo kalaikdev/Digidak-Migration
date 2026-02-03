@@ -191,11 +191,11 @@ public class DigidakExportOperation {
      * Extracts Digidak keywords to separate CSV file.
      */
     public void extractDigidakKeywordsCSV(IDfSession session, String outputFilePath, String whereClause) {
-        String baseDql = "SELECT DISTINCT r_object_id, keywords FROM edmapp_letter_folder WHERE ANY keywords IS NOT NULL";
+        String baseDql = "SELECT DISTINCT r_object_id, office_type, response_to_ioms_id, src_vertical_users, cgm_and_assigned_groups FROM edmapp_letter_folder";
 
         String dql = baseDql;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
-            dql += " AND " + whereClause;
+            dql += " WHERE " + whereClause;
         }
         dql += " ENABLE (ROW_BASED)";
 
@@ -211,21 +211,19 @@ public class DigidakExportOperation {
             query.setDQL(dql);
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
 
-            String[] headers = { "r_object_id", "keywords" };
+            String[] headers = { "r_object_id", "office_type", "response_to_ioms_id", "src_vertical_users", "cgm_and_assigned_groups" };
             writeLine(writer, headers);
 
             int count = 0;
             while (collection.next()) {
                 List<String> row = new ArrayList<>();
-                // r_object_id
-                row.add(collection.getString("r_object_id"));
-
-                // keywords (repeating attribute)
-                String kw = "";
-                if (collection.hasAttr("keywords")) {
-                    kw = collection.getAllRepeatingStrings("keywords", ";");
+                for (String header : headers) {
+                    String val = "";
+                    if (collection.hasAttr(header)) {
+                        val = collection.getString(header);
+                    }
+                    row.add(val);
                 }
-                row.add(kw);
 
                 writeLine(writer, row.toArray(new String[0]));
                 count++;
