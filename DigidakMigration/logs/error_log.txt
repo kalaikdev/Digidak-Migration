@@ -1,0 +1,198 @@
+﻿2026-01-29 23:31:21 INFO  DigidakExportOperation - ====================================================================================================
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Starting Digidak Export Operation
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Repository: NABARDUAT
+2026-01-29 23:31:21 INFO  DigidakExportOperation - User: dmadmin
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Where Clause: DATETOSTRING("r_creation_date", 'yyyy')='2017'
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Export Path: C:/DigidakMigration/UAT Export Digidak
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Thread Count: 10
+2026-01-29 23:31:21 INFO  DigidakExportOperation - Timeout (Hours): 24
+2026-01-29 23:31:21 INFO  DigidakExportOperation - ====================================================================================================
+2026-01-29 23:31:21 INFO  JKSKeystoreUtilForDfc - keystore file name is D:\MigrationUtil\DigidakMigration\target\classes\dfc.keystore
+2026-01-29 23:31:21 INFO  InitializeKeystoreForDfc - [DFC_SECURITY_IDENTITY_LOADED] Loaded identity from keystore, DFC alias=dfc, identity=dfc_kOX9LtlEqM9osUejU0w2ecU7tb4a
+2026-01-29 23:31:21 INFO  AuthenticationMgrForDfc - identity for authentication is dfc_kOX9LtlEqM9osUejU0w2ecU7tb4a
+2026-01-29 23:31:21 INFO  RuntimeContext - DFC Version is 21.4.0000.0147
+2026-01-29 23:31:21 INFO  ClassCacheManager$CacheCleanupTask - [DFC_BOF_RUNNING_CLEANUP] Running class cache cleanup task
+2026-01-29 23:31:24 WARN  ModuleManager - [DFC_BOF_COULDNT_CONNECT_TO_REGISTRY] Unable to connect to module registry, docbase name NABARDUAT username dm_bof_registry.
+com.documentum.fc.client.DfDocbrokerException: [DFC_DOCBROKER_REQUEST_FAILED] Request to Docbroker "NABARD:1489" failed
+	at com.documentum.fc.client.DfDocbrokerException.newRequestFailedException(DfDocbrokerException.java:13) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:30) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnectionFactory.newDocbrokerConnection(DocbrokerConnectionFactory.java:27) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.MapBuilder.issueRequest(MapBuilder.java:27) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getDataFromDocbroker(ServerMapBuilder.java:169) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getMap(ServerMapBuilder.java:61) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.DocbrokerClient.getServerMap(DocbrokerClient.java:152) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.updateServerChoices(ServerChoiceManager.java:159) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.updateServerChoicesIfNecessary(ServerChoiceManager.java:148) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.getServerChoices(ServerChoiceManager.java:47) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.getServerChoices(DocbaseConnection.java:285) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.establishNewRpcClient(DocbaseConnection.java:239) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.open(DocbaseConnection.java:138) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(DocbaseConnection.java:112) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(DocbaseConnection.java:72) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionFactory.newDocbaseConnection(DocbaseConnectionFactory.java:32) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.createNewConnection(DocbaseConnectionManager.java:202) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.getDocbaseConnection(DocbaseConnectionManager.java:132) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionFactory.newSession(SessionFactory.java:24) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.PrincipalAwareSessionFactory.newSession(PrincipalAwareSessionFactory.java:44) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.PooledSessionFactory.newSession(PooledSessionFactory.java:49) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.getSessionFromFactory(SessionManager.java:106) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionManager.java:281) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionManager.java:68) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.getSession(SessionManager.java:190) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.bof.classmgmt.ModuleManager.connect(ModuleManager.java:402) [dfc.jar:?]
+	at com.documentum.fc.client.impl.bof.classmgmt.ModuleManager.init(ModuleManager.java:357) [dfc.jar:?]
+	at com.documentum.fc.client.impl.bof.classmgmt.ModuleManager.getInstance(ModuleManager.java:43) [dfc.jar:?]
+	at com.documentum.fc.client.security.impl.DfcIdentityPublisher.<init>(DfcIdentityPublisher.java:44) [dfc.jar:?]
+	at com.documentum.fc.client.security.internal.RegistrationMgr.register(RegistrationMgr.java:34) [dfc.jar:?]
+	at com.documentum.fc.impl.RuntimeContext.<clinit>(RuntimeContext.java:205) [dfc.jar:?]
+	at com.documentum.fc.client.DfClient.<clinit>(DfClient.java:792) [dfc.jar:?]
+	at com.nabard.digidak.migration.DocumentumSessionManager.initSessionManager(DocumentumSessionManager.java:35) [classes/:?]
+	at com.nabard.digidak.migration.DigidakExportOperation.main(DigidakExportOperation.java:538) [classes/:?]
+Caused by: com.documentum.fc.client.DfIOException: [DM_SESSION_E_RPC_ERROR]error:  "Server communication failure"
+	at com.documentum.fc.client.DfIOException.newCommunicationFailureException(DfIOException.java:16) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:44) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:25) ~[dfc.jar:?]
+	... 32 more
+Caused by: java.io.IOException: NABARD
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.resolveHostNameCorrectly(NetwiseDocbrokerRpcClientFactory.java:362) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.connect(NetwiseDocbrokerRpcClientFactory.java:125) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.openSocket(NetwiseDocbrokerRpcClientFactory.java:105) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:40) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:25) ~[dfc.jar:?]
+	... 32 more
+2026-01-29 23:31:24 WARN  RegistrationMgr - [DFC_SECURITY_GR_PUBLICATION_FAILED] Publication of DFC instance with global registry failed
+com.documentum.fc.common.DfException: [DFC_BOF_GLOBAL_REGISTRY_UNAVAILABLE] Unable to connect to the global registry no session
+	at com.documentum.fc.client.security.impl.DfcIdentityPublisher.<init>(DfcIdentityPublisher.java:55) ~[dfc.jar:?]
+	at com.documentum.fc.client.security.internal.RegistrationMgr.register(RegistrationMgr.java:34) [dfc.jar:?]
+	at com.documentum.fc.impl.RuntimeContext.<clinit>(RuntimeContext.java:205) [dfc.jar:?]
+	at com.documentum.fc.client.DfClient.<clinit>(DfClient.java:792) [dfc.jar:?]
+	at com.nabard.digidak.migration.DocumentumSessionManager.initSessionManager(DocumentumSessionManager.java:35) [classes/:?]
+	at com.nabard.digidak.migration.DigidakExportOperation.main(DigidakExportOperation.java:538) [classes/:?]
+2026-01-29 23:31:24 INFO  DocumentumSessionManager - Session Manager initialized for repository: NABARDUAT
+2026-01-29 23:31:24 ERROR DigidakExportOperation - Digidak Export operation failed
+com.documentum.fc.client.DfDocbrokerException: [DFC_DOCBROKER_REQUEST_FAILED] Request to Docbroker "NABARD:1489" failed
+	at com.documentum.fc.client.DfDocbrokerException.newRequestFailedException(DfDocbrokerException.java:13) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:30) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnectionFactory.newDocbrokerConnection(DocbrokerConnectionFactory.java:27) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.MapBuilder.issueRequest(MapBuilder.java:27) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getDataFromDocbroker(ServerMapBuilder.java:169) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getMap(ServerMapBuilder.java:61) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.docbroker.DocbrokerClient.getServerMap(DocbrokerClient.java:152) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.updateServerChoices(ServerChoiceManager.java:159) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.updateServerChoicesIfNecessary(ServerChoiceManager.java:148) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.getServerChoices(ServerChoiceManager.java:47) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.getServerChoices(DocbaseConnection.java:285) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.establishNewRpcClient(DocbaseConnection.java:239) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.open(DocbaseConnection.java:138) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(DocbaseConnection.java:112) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(DocbaseConnection.java:72) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionFactory.newDocbaseConnection(DocbaseConnectionFactory.java:32) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.createNewConnection(DocbaseConnectionManager.java:202) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.getDocbaseConnection(DocbaseConnectionManager.java:132) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionFactory.newSession(SessionFactory.java:24) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.PrincipalAwareSessionFactory.newSession(PrincipalAwareSessionFactory.java:44) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.PooledSessionFactory.newSession(PooledSessionFactory.java:49) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.getSessionFromFactory(SessionManager.java:106) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionManager.java:281) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionManager.java:68) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.session.SessionManager.getSession(SessionManager.java:190) ~[dfc.jar:?]
+	at com.nabard.digidak.migration.DocumentumSessionManager.getSession(DocumentumSessionManager.java:58) ~[classes/:?]
+	at com.nabard.digidak.migration.DigidakExportOperation.main(DigidakExportOperation.java:541) [classes/:?]
+Caused by: com.documentum.fc.client.DfIOException: [DM_SESSION_E_RPC_ERROR]error:  "Server communication failure"
+	at com.documentum.fc.client.DfIOException.newCommunicationFailureException(DfIOException.java:16) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:44) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:25) ~[dfc.jar:?]
+	... 25 more
+Caused by: java.io.IOException: NABARD
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.resolveHostNameCorrectly(NetwiseDocbrokerRpcClientFactory.java:362) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.connect(NetwiseDocbrokerRpcClientFactory.java:125) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.openSocket(NetwiseDocbrokerRpcClientFactory.java:105) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbrokerRpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:40) ~[dfc.jar:?]
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<init>(DocbrokerConnection.java:25) ~[dfc.jar:?]
+	... 25 more
+java : DfDocbrokerException:: THREAD: main; MSG: 
+[DFC_DOCBROKER_REQUEST_FAILED] Request to Docbroker "NABARD:1489" failed; 
+ERRORCODE: ff; NEXT: null
+At line:1 char:1
++ java -cp "target/classes;config;..\Shared\*" com.nabard.digidak.migra ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (DfDocbrokerExce... ff; NEXT: null 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+	at com.documentum.fc.client.DfDocbrokerException.newRequestFailedException(DfD
+ocbrokerException.java:13)
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<ini
+t>(DocbrokerConnection.java:30)
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnectionFacto
+ry.newDocbrokerConnection(DocbrokerConnectionFactory.java:27)
+	at com.documentum.fc.client.impl.docbroker.MapBuilder.issueRequest(MapBuilder.
+java:27)
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getDataFromDocbrok
+er(ServerMapBuilder.java:169)
+	at com.documentum.fc.client.impl.docbroker.ServerMapBuilder.getMap(ServerMapBu
+ilder.java:61)
+	at com.documentum.fc.client.impl.docbroker.DocbrokerClient.getServerMap(Docbro
+kerClient.java:152)
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.update
+ServerChoices(ServerChoiceManager.java:159)
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.update
+ServerChoicesIfNecessary(ServerChoiceManager.java:148)
+	at com.documentum.fc.client.impl.connection.docbase.ServerChoiceManager.getSer
+verChoices(ServerChoiceManager.java:47)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.getServe
+rChoices(DocbaseConnection.java:285)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.establis
+hNewRpcClient(DocbaseConnection.java:239)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.open(Doc
+baseConnection.java:138)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(D
+ocbaseConnection.java:112)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnection.<init>(D
+ocbaseConnection.java:72)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionFactory.n
+ewDocbaseConnection(DocbaseConnectionFactory.java:32)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.c
+reateNewConnection(DocbaseConnectionManager.java:202)
+	at com.documentum.fc.client.impl.connection.docbase.DocbaseConnectionManager.g
+etDocbaseConnection(DocbaseConnectionManager.java:132)
+	at com.documentum.fc.client.impl.session.SessionFactory.newSession(SessionFact
+ory.java:24)
+	at com.documentum.fc.client.impl.session.PrincipalAwareSessionFactory.newSessi
+on(PrincipalAwareSessionFactory.java:44)
+	at com.documentum.fc.client.impl.session.PooledSessionFactory.newSession(Poole
+dSessionFactory.java:49)
+	at com.documentum.fc.client.impl.session.SessionManager.getSessionFromFactory(
+SessionManager.java:106)
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionMana
+ger.java:281)
+	at com.documentum.fc.client.impl.session.SessionManager.newSession(SessionMana
+ger.java:68)
+	at com.documentum.fc.client.impl.session.SessionManager.getSession(SessionMana
+ger.java:190)
+	at com.nabard.digidak.migration.DocumentumSessionManager.getSession(Documentum
+SessionManager.java:58)
+	at com.nabard.digidak.migration.DigidakExportOperation.main(DigidakExportOpera
+tion.java:541)
+Caused by: DfIOException:: THREAD: main; MSG: [DM_SESSION_E_RPC_ERROR]error:  
+"Server communication failure"; ERRORCODE: 100; NEXT: null
+	at com.documentum.fc.client.DfIOException.newCommunicationFailureException(DfI
+OException.java:16)
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbroker
+RpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:44
+)
+	at com.documentum.fc.client.impl.connection.docbroker.DocbrokerConnection.<ini
+t>(DocbrokerConnection.java:25)
+	... 25 more
+Caused by: java.io.IOException: NABARD
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbroker
+RpcClientFactory.resolveHostNameCorrectly(NetwiseDocbrokerRpcClientFactory.java
+:362)
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbroker
+RpcClientFactory.connect(NetwiseDocbrokerRpcClientFactory.java:125)
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbroker
+RpcClientFactory.openSocket(NetwiseDocbrokerRpcClientFactory.java:105)
+	at com.documentum.fc.client.impl.connection.docbroker.netwise.NetwiseDocbroker
+RpcClientFactory.newDocbrokerRpcClient(NetwiseDocbrokerRpcClientFactory.java:40
+)
+	... 26 more

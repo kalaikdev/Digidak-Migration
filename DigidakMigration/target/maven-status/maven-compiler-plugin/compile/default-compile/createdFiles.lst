@@ -1,0 +1,3 @@
+com\nabard\digidak\migration\DocumentumSessionManager.class
+com\nabard\digidak\migration\DigidakImportOperation.class
+com\nabard\digidak\migration\DigidakExportOperation.class
