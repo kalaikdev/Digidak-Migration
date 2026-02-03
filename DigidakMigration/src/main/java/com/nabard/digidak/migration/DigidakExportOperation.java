@@ -287,11 +287,10 @@ public class DigidakExportOperation {
         logger.info("Executing Keywords Query: " + dql);
 
         File mainExportDir = new File(outputFilePath);
-        File metadataExportDir = new File(mainExportDir, "digidakmetadata_export");
-        if (!metadataExportDir.exists()) {
-            metadataExportDir.mkdirs();
+        if (!mainExportDir.exists()) {
+            mainExportDir.mkdirs();
         }
-        File keywordsFile = new File(metadataExportDir, "DigidakRepeating_Export.csv");
+        File keywordsFile = new File(mainExportDir, "DigidakRepeating_Export.csv");
 
         IDfCollection collection = null;
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(keywordsFile))) {
