@@ -41,8 +41,67 @@ public class DigidakExportOperation {
      * @param threadCount Number of threads for parallel processing
      * @param timeoutHours Timeout in hours
      */
-    public void extractDigidakMetaDataCSV(IDfSession session, String outputFilePath, String whereClause, String repoName,
+    /**
+     * Extracts Single Digidak records (non-bulk, non-group letters) to CSV file.
+     * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true AND bulk_letter !='true'
+     */
+    public void extractSingleRecordsCSV(IDfSession session, String outputFilePath, String repoName,
             int threadCount, int timeoutHours) {
+        
+        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter !='true'";
+        String recordsDir = "digidak_single_records";
+        String csvFileName = "DigidakSingleRecords_Export.csv";
+        
+        logger.info("========== Exporting SINGLE Records ==========");
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true);
+    }
+
+    /**
+     * Extracts Group Digidak records to CSV file.
+     * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true
+     */
+    public void extractGroupRecordsCSV(IDfSession session, String outputFilePath, String repoName,
+            int threadCount, int timeoutHours) {
+        
+        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=true";
+        String recordsDir = "digidak_group_records";
+        String csvFileName = "DigidakGroupRecords_Export.csv";
+        
+        logger.info("========== Exporting GROUP Records ==========");
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true);
+    }
+
+    /**
+     * Extracts Subletter Digidak records (bulk letters) to CSV file.
+     * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'
+     * Note: Subletter records only export movement_register.csv (no document metadata)
+     */
+    public void extractSubletterRecordsCSV(IDfSession session, String outputFilePath, String repoName,
+            int threadCount, int timeoutHours) {
+        
+        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'";
+        String recordsDir = "digidak_subletter_records";
+        String csvFileName = "DigidakSubletterRecords_Export.csv";
+        
+        logger.info("========== Exporting SUBLETTER Records (Movement Register Only) ==========");
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, false);
+    }
+
+    /**
+     * Internal method to extract Digidak metadata to CSV file.
+     * 
+     * @param session Documentum session
+     * @param outputBasePath Base path for output
+     * @param whereClause WHERE clause for filtering
+     * @param repoName Repository name
+     * @param threadCount Number of threads for parallel processing
+     * @param timeoutHours Timeout in hours
+     * @param recordsDir Directory name for records
+     * @param csvFileName CSV file name
+     * @param exportDocuments If true, exports document metadata and content; if false, only exports movement register
+     */
+    private void extractRecordsInternal(IDfSession session, String outputBasePath, String whereClause, String repoName,
+            int threadCount, int timeoutHours, String recordsDir, String csvFileName, boolean exportDocuments) {
         
         // DQL Query for Digidak (Letter) records from source schema
         // Source type: edmapp_letter_folder
@@ -55,6 +114,13 @@ public class DigidakExportOperation {
         }
 
         logger.info("Executing Query: " + dql);
+
+        // Determine output file path
+        File baseDir = new File(outputBasePath);
+        if (!baseDir.exists()) {
+            baseDir.mkdirs();
+        }
+        String outputFilePath = new File(baseDir, csvFileName).getAbsolutePath();
 
         IDfCollection collection = null;
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
@@ -75,12 +141,8 @@ public class DigidakExportOperation {
             outputHeaders.add("error_message");
             writeLine(writer, outputHeaders.toArray(new String[0]));
 
-            // Base directory for digidak records
-            File outputFile = new File(outputFilePath);
-            String baseDir = outputFile.getParent();
-            if (baseDir == null)
-                baseDir = ".";
-            File digidakDir = new File(baseDir, "digidak_records");
+            // Create directory for records
+            File digidakDir = new File(baseDir, recordsDir);
             if (!digidakDir.exists()) {
                 digidakDir.mkdirs();
             }
@@ -89,7 +151,7 @@ public class DigidakExportOperation {
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
             int count = 0;
-            logger.info("Starting export of Digidak records...");
+            logger.info("Starting export of records to " + recordsDir + "...");
             while (collection.next()) {
                 final List<String> row = new ArrayList<>();
                 String tempObjectId = "";
@@ -130,10 +192,12 @@ public class DigidakExportOperation {
 
                         // Export Movement Register for this Digidak record
                         if (!digidakObjectId.isEmpty() && !digidakObjectName.isEmpty()) {
-                            logger.info("Processing Digidak " + currentCount + ": " + digidakObjectName);
+                            logger.info("Processing record " + currentCount + ": " + digidakObjectName);
                             try {
                                 exportMovementRegister(localSession, digidakDir, digidakObjectId, digidakObjectName, digidakUidNumber);
-                                exportDocumentMetadata(localSession, digidakDir, digidakObjectId, digidakObjectName);
+                                if (exportDocuments) {
+                                    exportDocumentMetadata(localSession, digidakDir, digidakObjectId, digidakObjectName);
+                                }
                             } catch (Exception e) {
                                 exportStatus = "Failed";
                                 exportError = e.getMessage();
@@ -150,7 +214,7 @@ public class DigidakExportOperation {
                         }
 
                     } catch (Exception e) {
-                        logger.error("Error processing Digidak row " + currentCount + ": " + e.getMessage(), e);
+                        logger.error("Error processing record row " + currentCount + ": " + e.getMessage(), e);
                     } finally {
                         if (localSession != null) {
                             DocumentumSessionManager.releaseSession(localSession);
@@ -172,10 +236,10 @@ public class DigidakExportOperation {
                 Thread.currentThread().interrupt();
             }
 
-            logger.info("Exported " + count + " Digidak rows to " + outputFilePath);
+            logger.info("Exported " + count + " rows to " + outputFilePath);
 
         } catch (DfException | IOException e) {
-            logger.error("Error in extractDigidakMetaDataCSV", e);
+            logger.error("Error in extractRecordsInternal", e);
         } finally {
             if (collection != null) {
                 try {
@@ -185,6 +249,27 @@ public class DigidakExportOperation {
                 }
             }
         }
+    }
+
+    /**
+     * Legacy method - Extracts Digidak metadata to CSV file with custom WHERE clause.
+     * 
+     * @param session Documentum session
+     * @param outputFilePath Path to output CSV file
+     * @param whereClause Optional WHERE clause for filtering
+     * @param repoName Repository name
+     * @param threadCount Number of threads for parallel processing
+     * @param timeoutHours Timeout in hours
+     */
+    public void extractDigidakMetaDataCSV(IDfSession session, String outputFilePath, String whereClause, String repoName,
+            int threadCount, int timeoutHours) {
+        
+        File outputFile = new File(outputFilePath);
+        String baseDir = outputFile.getParent();
+        if (baseDir == null) baseDir = ".";
+        
+        extractRecordsInternal(session, baseDir, whereClause, repoName, threadCount, timeoutHours, 
+                "digidak_records", "DigidakMetadata_Export.csv", true);
     }
 
     /**
@@ -201,8 +286,12 @@ public class DigidakExportOperation {
 
         logger.info("Executing Keywords Query: " + dql);
 
-        File mainExportFile = new File(outputFilePath);
-        File keywordsFile = new File(mainExportFile.getParent(), "DigidakKeywords_Export.csv");
+        File mainExportDir = new File(outputFilePath);
+        File metadataExportDir = new File(mainExportDir, "digidakmetadata_export");
+        if (!metadataExportDir.exists()) {
+            metadataExportDir.mkdirs();
+        }
+        File keywordsFile = new File(metadataExportDir, "DigidakRepeating_Export.csv");
 
         IDfCollection collection = null;
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(keywordsFile))) {
@@ -514,8 +603,21 @@ public class DigidakExportOperation {
 
             // Run Export
             DigidakExportOperation exporter = new DigidakExportOperation();
+            
+            // Export keywords
             exporter.extractDigidakKeywordsCSV(session, exportPath, whereClause);
-            exporter.extractDigidakMetaDataCSV(session, exportPath, whereClause, repoName, threadCount, timeoutHours);
+            
+            // Export Single Records (non-bulk, non-group letters)
+            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true AND bulk_letter !='true'
+            exporter.extractSingleRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
+            
+            // Export Group Records
+            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true
+            exporter.extractGroupRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
+            
+            // Export Subletter Records (bulk letters)
+            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'
+            exporter.extractSubletterRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
 
             // Release Session
             DocumentumSessionManager.releaseSession(session);
