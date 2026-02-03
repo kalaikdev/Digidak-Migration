@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digidak Migration Utility Documentation</title>
+    <style>
+        :root {
+            --primary: #059669;
+            --secondary: #475569;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+            background-color: var(--surface);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            min-height: 100vh;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: var(--text);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-top: 2rem;
+        }
+
+        h1 {
+            border-bottom: none;
+            font-size: 2.5rem;
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th,
+        td {
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+
+        code {
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+
+        pre {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25em 0.6em;
+            font-size: 75%;
+            font-weight: 700;
+            line-height: 1;
+            color: #fff;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.375rem;
+            background-color: var(--primary);
+        }
+
+        .mermaid {
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .note {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .success {
+            background-color: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Digidak Migration Utility</h1>
+
+        <div class="section">
+            <h2>1. Overview</h2>
+            <p>This utility provides a robust mechanism to migrate Digidak Folders, Movement Registers, and Supporting
+                Documents from a legacy Documentum repository to a new target environment. It supports hierarchical data
+                preservation, complex attribute mapping, content type detection, and multi-threaded processing.</p>
+
+            <div class="success">
+                <strong>Module:</strong> Digidak Migration<br>
+                <strong>Version:</strong> 1.0-SNAPSHOT<br>
+                <strong>Java Version:</strong> 17+
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>2. Process Architecture</h2>
+            <p>The migration is divided into two distinct phases: <strong>Export</strong> and <strong>Import</strong>,
+                connected via a local staging structure.</p>
+
+            <div class="mermaid">
+                flowchart LR
+                subgraph Source [Legacy Repository]
+                SrcObj[Digidak Objects & Content]
+                end
+
+                subgraph Staging [Staging Area]
+                CSV[Metadata CSVs]
+                Files[Physical Content]
+                end
+
+                subgraph Target [New Repository]
+                TgtObj[Mapped Digidak Objects]
+                end
+
+                Source -->|DigidakExportOperation| Staging
+                Staging -->|DigidakImportOperation| Target
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Export Process</h2>
+            <p>The <code>DigidakExportOperation</code> extracts metadata into CSV files and downloads content files,
+                organizing
+                them by Digidak record.</p>
+            <div class="mermaid">
+                sequenceDiagram
+                participant DFC as DFC / Legacy Repo
+                participant Export as DigidakExportOperation
+                participant Disk as Local File System
+
+                Export->>DFC: Run Digidak Metadata DQL
+                DFC-->>Export: Digidak Records
+                loop For Each Digidak
+                Export->>Disk: Create Digidak Directory
+                Export->>DFC: Fetch Movements & Documents
+                DFC-->>Export: Nested Metadata
+                Export->>Disk: Save CSVs & Download Content
+                end
+            </div>
+
+            <h3>3.1 Export Output Structure</h3>
+            <pre>
+/export_path
+|-- DigidakMetadata_Export.csv       (Main metadata file)
+|-- DigidakKeywords_Export.csv       (Keywords file)
+|-- digidak_records/
+    |-- DIGIDAK_001/
+    |   |-- movement_register.csv
+    |   |-- document_metadata.csv
+    |   |-- file1.pdf
+    |   |-- file2.docx
+    |-- DIGIDAK_002/
+    |   |-- ...
+            </pre>
+        </div>
+
+        <div class="section">
+            <h2>4. Import Process</h2>
+            <p>The <code>DigidakImportOperation</code> reads the staging area and reconstructs the objects in the target
+                repository.</p>
+            <div class="mermaid">
+                flowchart TD
+                Read[Read Metadata CSV] --> Worker[Process Record]
+                Worker --> Check{Status = SUCCESS?}
+                Check -- Yes --> Skip[Skip Record]
+                Check -- No --> Cleanup[Cleanup Existing Obj]
+                Cleanup --> Create[Create New Object]
+                Create --> Map[Apply Mappings]
+                Map --> Save[Link & Save]
+                Save --> Update[Update CSV Status]
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>5. Configuration</h2>
+            <p>All configuration is managed through <code>config/application.properties</code>.</p>
+
+            <h3>5.1 Connection Settings</h3>
+            <table>
+                <tr>
+                    <th>Property</th>
+                    <th>Description</th>
+                    <th>Example</th>
+                </tr>
+                <tr>
+                    <td>dctm.username</td>
+                    <td>Documentum username</td>
+                    <td>dmadmin</td>
+                </tr>
+                <tr>
+                    <td>dctm.password</td>
+                    <td>Documentum password</td>
+                    <td>password123</td>
+                </tr>
+                <tr>
+                    <td>dctm.repository</td>
+                    <td>Repository name</td>
+                    <td>NABARDUAT</td>
+                </tr>
+            </table>
+
+            <h3>5.2 Export/Import Settings</h3>
+            <table>
+                <tr>
+                    <th>Property</th>
+                    <th>Description</th>
+                    <th>Default</th>
+                </tr>
+                <tr>
+                    <td>query.where.clause</td>
+                    <td>WHERE clause filter for export</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>path.export</td>
+                    <td>Export/staging directory</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>import.legacy.digidakpath</td>
+                    <td>Target import path in repository</td>
+                    <td>/Legacy/Digidak</td>
+                </tr>
+                <tr>
+                    <td>export.thread.count</td>
+                    <td>Parallel threads for export</td>
+                    <td>10</td>
+                </tr>
+                <tr>
+                    <td>import.thread.count</td>
+                    <td>Parallel threads for import</td>
+                    <td>5</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>6. Attribute Mappings</h2>
+            <p>Active mappings from <code>application.properties</code>:</p>
+
+            <h3>6.1 Digidak Folder (edmapp_letter_folder &rarr; cms_digidak_folder)</h3>
+            <table>
+                <tr>
+                    <th>Source Attribute (CSV Header)</th>
+                    <th>Target Attribute</th>
+                </tr>
+                <tr>
+                    <td>r_object_id</td>
+                    <td>migrated_id</td>
+                </tr>
+                <tr>
+                    <td>object_name</td>
+                    <td>object_name</td>
+                </tr>
+                <tr>
+                    <td>subject</td>
+                    <td>subject</td>
+                </tr>
+                <tr>
+                    <td>ho_ro</td>
+                    <td>ho_ro</td>
+                </tr>
+                <tr>
+                    <td>letter_type</td>
+                    <td>letter_type</td>
+                </tr>
+                <tr>
+                    <td>file_number</td>
+                    <td>file_number</td>
+                </tr>
+                <tr>
+                    <td>department</td>
+                    <td>department_name</td>
+                </tr>
+                <tr>
+                    <td>r_creation_date</td>
+                    <td>created_on</td>
+                </tr>
+                <tr>
+                    <td>r_creator_name</td>
+                    <td>created_by</td>
+                </tr>
+            </table>
+
+            <h3>6.2 Movement Register (edmapp_letter_movement &rarr; cms_digidak_movement_re)</h3>
+            <table>
+                <tr>
+                    <th>Source Attribute</th>
+                    <th>Target Attribute</th>
+                </tr>
+                <tr>
+                    <td>assigned_user</td>
+                    <td>assigned_user</td>
+                </tr>
+                <tr>
+                    <td>assigned_group</td>
+                    <td>group_name</td>
+                </tr>
+                <tr>
+                    <td>task_complete_date</td>
+                    <td>completion_date</td>
+                </tr>
+                <tr>
+                    <td>action</td>
+                    <td>decision</td>
+                </tr>
+                <tr>
+                    <td>performer</td>
+                    <td>performer</td>
+                </tr>
+            </table>
+
+            <h3>6.3 Document (edmapp_letter_document &rarr; cms_digidak_document)</h3>
+            <table>
+                <tr>
+                    <th>Source Attribute</th>
+                    <th>Target Attribute</th>
+                </tr>
+                <tr>
+                    <td>r_object_id</td>
+                    <td>migrated_id</td>
+                </tr>
+                <tr>
+                    <td>category</td>
+                    <td>category</td>
+                </tr>
+                <tr>
+                    <td>object_name</td>
+                    <td>object_name</td>
+                </tr>
+                <tr>
+                    <td>r_creation_date</td>
+                    <td>created_on</td>
+                </tr>
+                <tr>
+                    <td>r_creator_name</td>
+                    <td>created_by</td>
+                </tr>
+            </table>
+
+            <div class="success">
+                <strong>Schema Summary:</strong>
+                <ul>
+                    <li><strong>Source Types:</strong> edmapp_letter_folder, edmapp_letter_movement,
+                        edmapp_letter_document</li>
+                    <li><strong>Target Types:</strong> cms_digidak_folder, cms_digidak_movement_re, cms_digidak_document
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>7. Execution & Deployment</h2>
+
+            <h3>7.1 Directory Structure</h3>
+            <pre>
+/DigidakMigration
+|-- src/                    (Java source files)
+|-- config/                 (Configuration properties)
+|-- lib/                    (Dependencies - created after build)
+|-- logs/                   (Runtime logs)
+|-- pom.xml                 (Maven build file)
+|-- run-export.bat          (Script to execute EXPORT)
+|-- run-import.bat          (Script to execute IMPORT)
+|-- create-package.bat      (Script to build distribution)
+            </pre>
+
+            <h3>7.2 Building the Project</h3>
+            <p>Run <code>create-package.bat</code> to compile and create a distribution package.</p>
+            <pre>cd DigidakMigration
+create-package.bat</pre>
+
+            <h3>7.3 Running Export</h3>
+            <p>1. Configure <code>config/application.properties</code> with source repository credentials.</p>
+            <p>2. Run <code>run-export.bat</code></p>
+            <pre>run-export.bat</pre>
+
+            <h3>7.4 Running Import</h3>
+            <p>1. Configure <code>config/application.properties</code> with target repository credentials.</p>
+            <p>2. Ensure export staging data is available at <code>path.export</code>.</p>
+            <p>3. Run <code>run-import.bat</code></p>
+            <pre>run-import.bat</pre>
+
+            <h3>7.5 Manual Command Line</h3>
+            <pre>
+REM Export
+java -cp "config;lib/*" com.nabard.digidak.migration.DigidakExportOperation
+
+REM Import
+java -cp "config;lib/*" com.nabard.digidak.migration.DigidakImportOperation
+            </pre>
+        </div>
+
+        <div class="section">
+            <h2>8. Customization</h2>
+
+            <h3>8.1 Source Schema Details</h3>
+            <p>The source schema uses the following Documentum types:</p>
+            <ul>
+                <li><code>edmapp_letter_folder</code> - Main Digidak folder object</li>
+                <li><code>edmapp_letter_movement</code> - Movement register entries</li>
+                <li><code>edmapp_letter_document</code> - Associated documents</li>
+            </ul>
+
+            <h3>8.2 Adding New Attributes</h3>
+            <p>To add new attribute mappings:</p>
+            <ol>
+                <li>Add the attribute to the DQL SELECT clause in export operation</li>
+                <li>Add the attribute to the headers array in the export method</li>
+                <li>Add mapping in <code>application.properties</code>:
+                    <code>import.digidak.mapping.&lt;csv_header&gt;=&lt;target_attr&gt;</code></li>
+            </ol>
+
+            <div class="warning">
+                <strong>Important:</strong> Always test migrations in a non-production environment first.
+                Verify data integrity after migration before proceeding to production.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>9. Troubleshooting</h2>
+            <table>
+                <tr>
+                    <th>Issue</th>
+                    <th>Solution</th>
+                </tr>
+                <tr>
+                    <td>Java not found</td>
+                    <td>Install Java 17+ or place bundled JDK in <code>java</code> folder</td>
+                </tr>
+                <tr>
+                    <td>DFC connection failed</td>
+                    <td>Verify <code>dfc.properties</code> and network connectivity</td>
+                </tr>
+                <tr>
+                    <td>Attribute not found</td>
+                    <td>Check target type schema has the specified attribute</td>
+                </tr>
+                <tr>
+                    <td>Import fails with cleanup error</td>
+                    <td>Manually remove existing object and retry</td>
+                </tr>
+                <tr>
+                    <td>File timeout during import</td>
+                    <td>Increase <code>import.file.timeout.minutes</code></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>

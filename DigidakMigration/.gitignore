@@ -1,0 +1,32 @@
+# Compiled class files
+*.class
+
+# Log files
+*.log
+logs/
+
+# Maven target directory
+target/
+
+# Distribution directory
+dist/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Export data (contains sensitive or large files)
+*Export*/
+
+# Keystore files (sensitive)
+*.keystore
+
+# Temporary files
+*.tmp
+*.bak

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.nabard</groupId>
+    <artifactId>digidak-migration-util</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <name>Digidak Migration Utility</name>
+    <description>Utility for migrating Digidak records from legacy Documentum repository to new target environment</description>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- DFC Dependency from Shared folder -->
+        <dependency>
+            <groupId>com.documentum</groupId>
+            <artifactId>dfc</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/../Shared/dfc.jar</systemPath>
+        </dependency>
+
+        <!-- Common Dependencies found in Shared -->
+        <dependency>
+             <groupId>commons-lang</groupId>
+             <artifactId>commons-lang</artifactId>
+             <version>2.6</version>
+             <scope>system</scope>
+             <systemPath>${project.basedir}/../Shared/commons-lang-2.6.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2-api</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/../Shared/log4j-1.2-api-2.13.3.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.13.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/../Shared/log4j-core-2.13.3.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.13.3</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/../Shared/log4j-api-2.13.3.jar</systemPath>
+        </dependency>
+
+        <!-- Jakarta XML Bind for xCP Aspects -->
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>3.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>3.0.1</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>config</directory>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
