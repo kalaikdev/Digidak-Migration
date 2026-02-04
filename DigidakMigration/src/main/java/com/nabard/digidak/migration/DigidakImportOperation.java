@@ -85,6 +85,13 @@ public class DigidakImportOperation {
         logger.info("Target Path: " + targetPath);
         logger.info("Thread Count: " + threadCount);
 
+        try {
+            ensureTargetPath(session, targetPath);
+        } catch (DfException e) {
+             logger.error("Failed to ensure target path: " + targetPath, e);
+             return;
+        }
+
         Map<String, List<String>> keywordsMap = loadKeywords(exportBaseDir);
 
         File csvFile = new File(csvFilePath);
@@ -193,7 +200,7 @@ public class DigidakImportOperation {
                         }
 
                         IDfSysObject digidakObj = createMappedObject(localSession, headers.toArray(new String[0]),
-                                values.toArray(new String[0]), digidakType, digidakMapping, digidakConstants);
+                                values.toArray(new String[0]), digidakType, digidakMapping, digidakConstants, targetPath);
 
                         if (rObjectIdIdx != -1 && rObjectIdIdx < values.size()) {
                             String rObjectId = values.get(rObjectIdIdx);
@@ -228,10 +235,11 @@ public class DigidakImportOperation {
                                 : digidakFolderName;
 
                         File digidakDir = new File(
-                                exportBaseDir + File.separator + "digidak_records" + File.separator + folderNameOnDisk);
+                                exportBaseDir + File.separator + "digidak_single_records" + File.separator + folderNameOnDisk);
                         if (digidakDir.exists() && digidakDir.isDirectory()) {
-                            importMovementRegisters(localSession, digidakObj, digidakDir);
-                            importDocuments(localSession, digidakObj, digidakDir);
+                            // Skipped: importing only cms_digidak_folder
+                            // importMovementRegisters(localSession, digidakObj, digidakDir);
+                            // importDocuments(localSession, digidakObj, digidakDir);
                         } else {
                             logger.warn("Digidak directory not found on disk: " + digidakDir.getAbsolutePath());
                         }
@@ -322,7 +330,7 @@ public class DigidakImportOperation {
 
                 try {
                     IDfSysObject movementObj = createMappedObject(session, headers, values, movementType,
-                            movementMapping, null);
+                            movementMapping, null, null);
                     movementObj.link(parentDigidak.getObjectId().toString());
                     movementObj.save();
                 } catch (Exception e) {
@@ -383,7 +391,7 @@ public class DigidakImportOperation {
                     String typeToUse = documentType;
                     Map<String, String> mappingToUse = documentMapping;
 
-                    IDfSysObject docObj = createMappedObject(session, headers, values, typeToUse, mappingToUse, null);
+                    IDfSysObject docObj = createMappedObject(session, headers, values, typeToUse, mappingToUse, null, null);
 
                     // Set content if file exists
                     if (!originalObjectName.isEmpty()) {
@@ -509,9 +517,54 @@ public class DigidakImportOperation {
      * Creates a Documentum object with mapped attributes.
      */
     private IDfSysObject createMappedObject(IDfSession session, String[] headers, String[] values,
-            String targetType, Map<String, String> mapping, Map<String, String> constants) throws DfException {
-        IDfSysObject obj = (IDfSysObject) session.newObject(targetType);
+            String targetType, Map<String, String> mapping, Map<String, String> constants, String targetPath) throws DfException {
+        
+        boolean isTboType = "cms_digidak_folder".equals(targetType);
+        IDfSysObject obj;
 
+        if (isTboType) {
+            // Bypass TBO instantiation by creating as dm_folder first
+            obj = (IDfSysObject) session.newObject("dm_folder");
+        } else {
+            obj = (IDfSysObject) session.newObject(targetType);
+        }
+
+        // Apply attributes (first pass)
+        populateObjectAttributes(obj, headers, values, mapping, constants);
+
+        if (isTboType) {
+            // Link to target path avoids default cabinet issues
+            if (targetPath != null && !targetPath.isEmpty()) {
+                 obj.link(targetPath);
+            }
+            // Save as dm_folder to persist standard attributes
+            obj.save();
+            String objectId = obj.getObjectId().getId();
+            logger.info("Created temp dm_folder with ID: " + objectId + ". Converting to " + targetType);
+
+            // Change Type via DQL
+            String dql = "CHANGE dm_folder OBJECTS TO \"cms_digidak_folder\" WHERE r_object_id = '" + objectId + "'";
+            IDfQuery query = new DfQuery();
+            query.setDQL(dql);
+            query.execute(session, IDfQuery.DF_EXEC_QUERY);
+            
+            // Apply custom attributes via DQL to avoid TBO loading (which hangs on getObject)
+            updateAttributesViaDQL(session, objectId, headers, values, mapping, constants);
+            
+            // We return the original object reference (dm_folder) to avoid triggering TBO load by refetching.
+            // The ID is correct, which is what matters for child operations.
+        }
+        
+        // Final flag check (for non-TBO types only)
+        if (!isTboType && obj.hasAttr("is_migrated")) {
+            obj.setBoolean("is_migrated", true);
+        }
+
+        return obj;
+    }
+
+    private void populateObjectAttributes(IDfSysObject obj, String[] headers, String[] values, 
+             Map<String, String> mapping, Map<String, String> constants) throws DfException {
         // 1. apply mapping from CSV
         for (int i = 0; i < headers.length; i++) {
             String csvColumn = headers[i];
@@ -536,9 +589,7 @@ public class DigidakImportOperation {
                     } else {
                         obj.setString(dctmAttr, attrValue);
                     }
-                } else {
-                    logger.warn("Attribute " + dctmAttr + " not found on " + targetType);
-                }
+                } 
             }
         }
 
@@ -549,18 +600,60 @@ public class DigidakImportOperation {
                 String constValue = entry.getValue();
                 if (obj.hasAttr(dqlAttr)) {
                     obj.setString(dqlAttr, constValue);
-                } else {
-                    logger.warn("Constant Attribute " + dqlAttr + " not found on " + targetType);
                 }
             }
         }
+    }
 
-        // Set is_migrated flag to true if the attribute exists
-        if (obj.hasAttr("is_migrated")) {
-            obj.setBoolean("is_migrated", true);
+    private void updateAttributesViaDQL(IDfSession session, String objectId, String[] headers, String[] values,
+            Map<String, String> mapping, Map<String, String> constants) throws DfException {
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("UPDATE cms_digidak_folder OBJECTS SET ");
+        boolean hasUpdates = false;
+
+        // Mappings
+        for (int i = 0; i < headers.length; i++) {
+             String key = headers[i];
+             String val = values[i];
+             String attr = mapping.get(key);
+             if (attr != null && val != null && !val.isEmpty()) {
+                 // Skip standard attrs already set on dm_folder
+                 if (attr.equals("object_name") || attr.equals("r_creation_date") || attr.equals("r_creator_name")) continue;
+                 
+                 if (hasUpdates) sb.append(", ");
+                 sb.append("\"").append(attr).append("\"").append("='").append(val.replace("'", "''")).append("'");
+                 hasUpdates = true;
+             }
         }
 
-        return obj;
+        // Constants
+        if (constants != null) {
+            for (Map.Entry<String, String> entry : constants.entrySet()) {
+                String key = entry.getKey();
+                // Skip standard
+                if (key.equals("object_name") || key.equals("r_creation_date") || key.equals("r_creator_name")) continue;
+
+                if (hasUpdates) sb.append(", ");
+                sb.append("\"").append(key).append("\"").append("='").append(entry.getValue().replace("'", "''")).append("'");
+                hasUpdates = true;
+            }
+        }
+        
+        // Manual override for is_migrated logic
+        // If not already in constants (it usually is), ensure it is set
+        if (!sb.toString().contains("is_migrated") && (mapping == null || !mapping.containsValue("is_migrated"))) {
+             if (hasUpdates) sb.append(", ");
+             sb.append("is_migrated=TRUE");
+             hasUpdates = true;
+        }
+
+        if (hasUpdates) {
+             sb.append(" WHERE r_object_id = '").append(objectId).append("'");
+             IDfQuery q = new DfQuery();
+             q.setDQL(sb.toString());
+             q.execute(session, IDfQuery.DF_EXEC_QUERY);
+        }
     }
 
     /**
@@ -614,12 +707,28 @@ public class DigidakImportOperation {
      */
     private boolean cleanupDigidak(IDfSession session, IDfSysObject digidakObj, String folderPath) {
         try {
-            logger.info("Cleaning up existing failed Digidak folder: " + folderPath + " ("
-                    + digidakObj.getObjectId().toString() + ")");
-            deleteRecursively(session, digidakObj);
+            String objectId = digidakObj.getObjectId().getId();
+            logger.info("Unlinking existing failed Digidak via DQL: " + folderPath + " (" + objectId + ")");
+            
+            // Calculate parent path
+            String parentPath = "/";
+            int lastSlash = folderPath.lastIndexOf('/');
+            if (lastSlash > 0) {
+                parentPath = folderPath.substring(0, lastSlash);
+            }
+            
+            IDfQuery q = new DfQuery();
+            String unlink = "UPDATE dm_sysobject OBJECTS UNLINK '" + parentPath + "' WHERE r_object_id = '" + objectId + "'";
+            q.setDQL(unlink);
+            q.execute(session, IDfQuery.DF_EXEC_QUERY);
+            
+            // Rename to avoid collision if still in folder (unlikely if unlink works) or system wide uniqueness?
+            // Folder names are unique within parent folder. So simple Unlink is enough.
+            // But renaming ensures we don't accidentally pick it up again if we search by name globally (we search by path, so fine).
+            
             return true;
         } catch (Exception e) {
-            logger.warn("Failed to cleanup existing Digidak " + folderPath + ": " + e.getMessage());
+            logger.warn("Failed to cleanup (unlink) existing Digidak " + folderPath + ": " + e.getMessage());
             return false;
         }
     }
@@ -771,11 +880,20 @@ public class DigidakImportOperation {
                     prop.getProperty("import.date.format", "dd/MM/yyyy, h:mm:ss a"),
                     fileTimeoutMinutes);
 
-            DocumentumSessionManager.initSessionManager(repo, user, pass);
+        // Explicitly disable BOF to avoid TBO loading issues
+        try {
+            java.util.Properties systemProps = System.getProperties();
+            systemProps.setProperty("dfc.bof.enable", "false");
+            // Also try DfPreferences if available statically/via config
+        } catch (Exception ex) {
+            logger.warn("Failed to set BOF system property: " + ex.getMessage());
+        }
+
+        DocumentumSessionManager.initSessionManager(repo, user, pass);
             IDfSession session = DocumentumSessionManager.getSession(repo);
 
             String csvFilePath = exportPath + (exportPath.endsWith(File.separator) ? "" : File.separator)
-                    + "DigidakMetadata_Export.csv";
+                    + "DigidakSingleRecords_Export.csv";
             importer.importDigidakFromCSV(session, csvFilePath, importPath, exportPath, importThreadCount, repo);
 
             DocumentumSessionManager.releaseSession(session);

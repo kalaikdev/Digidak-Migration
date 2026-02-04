@@ -33,16 +33,16 @@ if exist "java\bin\java.exe" (
 )
 
 REM Set classpath
-set "CLASSPATH=config;lib\*;..\Shared\*"
+set "CLASSPATH=config;target\classes;lib\*;..\Shared\*"
 
 echo.
 echo Starting Digidak Import...
 echo.
 
 if defined JAVA_HOME (
-    "%JAVA_HOME%\bin\java" -cp "%CLASSPATH%" com.nabard.digidak.migration.DigidakImportOperation
+    "%JAVA_HOME%\bin\java" --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.base/java.security=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.net=ALL-UNNAMED -cp "%CLASSPATH%" com.nabard.digidak.migration.DigidakImportOperation
 ) else (
-    java -cp "%CLASSPATH%" com.nabard.digidak.migration.DigidakImportOperation
+    java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.base/java.security=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.net=ALL-UNNAMED -cp "%CLASSPATH%" com.nabard.digidak.migration.DigidakImportOperation
 )
 
 echo.
