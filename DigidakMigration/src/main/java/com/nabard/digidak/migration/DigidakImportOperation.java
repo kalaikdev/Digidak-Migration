@@ -609,7 +609,7 @@ public class DigidakImportOperation {
             Map<String, String> mapping, Map<String, String> constants) throws DfException {
         
         StringBuilder sb = new StringBuilder();
-        sb.append("UPDATE cms_digidak_folder OBJECTS SET ");
+        sb.append("UPDATE cms_digidak_folder OBJECTS ");
         boolean hasUpdates = false;
 
         // Mappings
@@ -621,8 +621,7 @@ public class DigidakImportOperation {
                  // Skip standard attrs already set on dm_folder
                  if (attr.equals("object_name") || attr.equals("r_creation_date") || attr.equals("r_creator_name")) continue;
                  
-                 if (hasUpdates) sb.append(", ");
-                 sb.append("\"").append(attr).append("\"").append("='").append(val.replace("'", "''")).append("'");
+                 sb.append("SET ").append(attr).append("='").append(val.replace("'", "''")).append("' ");
                  hasUpdates = true;
              }
         }
@@ -634,8 +633,13 @@ public class DigidakImportOperation {
                 // Skip standard
                 if (key.equals("object_name") || key.equals("r_creation_date") || key.equals("r_creator_name")) continue;
 
-                if (hasUpdates) sb.append(", ");
-                sb.append("\"").append(key).append("\"").append("='").append(entry.getValue().replace("'", "''")).append("'");
+                String val = entry.getValue();
+                // Handle boolean attributes without quotes
+                if (key.equals("is_migrated")) {
+                    sb.append("SET ").append(key).append("=").append(val.equalsIgnoreCase("true") ? "TRUE" : "FALSE").append(" ");
+                } else {
+                    sb.append("SET ").append(key).append("='").append(val.replace("'", "''")).append("' ");
+                }
                 hasUpdates = true;
             }
         }
@@ -643,15 +647,16 @@ public class DigidakImportOperation {
         // Manual override for is_migrated logic
         // If not already in constants (it usually is), ensure it is set
         if (!sb.toString().contains("is_migrated") && (mapping == null || !mapping.containsValue("is_migrated"))) {
-             if (hasUpdates) sb.append(", ");
-             sb.append("is_migrated=TRUE");
+             sb.append("SET is_migrated=TRUE ");
              hasUpdates = true;
         }
 
         if (hasUpdates) {
-             sb.append(" WHERE r_object_id = '").append(objectId).append("'");
+             sb.append("WHERE r_object_id = '").append(objectId).append("'");
+             String dql = sb.toString();
+             logger.info("Executing DQL UPDATE: " + dql);
              IDfQuery q = new DfQuery();
-             q.setDQL(sb.toString());
+             q.setDQL(dql);
              q.execute(session, IDfQuery.DF_EXEC_QUERY);
         }
     }
