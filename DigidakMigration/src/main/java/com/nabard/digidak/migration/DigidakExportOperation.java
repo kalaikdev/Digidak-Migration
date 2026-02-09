@@ -53,7 +53,7 @@ public class DigidakExportOperation {
         String csvFileName = "DigidakSingleRecords_Export.csv";
         
         logger.info("========== Exporting SINGLE Records ==========");
-        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true);
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true, true);
     }
 
     /**
@@ -68,7 +68,7 @@ public class DigidakExportOperation {
         String csvFileName = "DigidakGroupRecords_Export.csv";
         
         logger.info("========== Exporting GROUP Records ==========");
-        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true);
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true, false);
     }
 
     /**
@@ -84,7 +84,7 @@ public class DigidakExportOperation {
         String csvFileName = "DigidakSubletterRecords_Export.csv";
         
         logger.info("========== Exporting SUBLETTER Records (Movement Register Only) ==========");
-        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, false);
+        extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, false, true);
     }
 
     /**
@@ -101,7 +101,7 @@ public class DigidakExportOperation {
      * @param exportDocuments If true, exports document metadata and content; if false, only exports movement register
      */
     private void extractRecordsInternal(IDfSession session, String outputBasePath, String whereClause, String repoName,
-            int threadCount, int timeoutHours, String recordsDir, String csvFileName, boolean exportDocuments) {
+            int threadCount, int timeoutHours, String recordsDir, String csvFileName, boolean exportDocuments, boolean exportMovementRegister) {
         
         // DQL Query for Digidak (Letter) records from source schema
         // Source type: edmapp_letter_folder
@@ -203,7 +203,9 @@ public class DigidakExportOperation {
                         if (!digidakObjectId.isEmpty() && !digidakObjectName.isEmpty()) {
                             logger.info("Processing record " + currentCount + ": " + digidakObjectName);
                             try {
-                                exportMovementRegister(localSession, digidakDir, digidakObjectId, digidakObjectName, digidakUidNumber);
+                                if (exportMovementRegister) {
+                                    exportMovementRegister(localSession, digidakDir, digidakObjectId, digidakObjectName, digidakUidNumber);
+                                }
                                 if (exportDocuments) {
                                     exportDocumentMetadata(localSession, digidakDir, digidakObjectId, digidakObjectName);
                                 }
@@ -278,7 +280,7 @@ public class DigidakExportOperation {
         if (baseDir == null) baseDir = ".";
         
         extractRecordsInternal(session, baseDir, whereClause, repoName, threadCount, timeoutHours, 
-                "digidak_records", "DigidakMetadata_Export.csv", true);
+                "digidak_records", "DigidakMetadata_Export.csv", true, true);
     }
 
     /**
