@@ -238,8 +238,8 @@ public class DigidakImportOperation {
                                 exportBaseDir + File.separator + "digidak_single_records" + File.separator + folderNameOnDisk);
                         if (digidakDir.exists() && digidakDir.isDirectory()) {
                             // Skipped: importing only cms_digidak_folder
-                            // importMovementRegisters(localSession, digidakObj, digidakDir);
-                            // importDocuments(localSession, digidakObj, digidakDir);
+                            importMovementRegisters(localSession, digidakObj, digidakDir);
+                            importDocuments(localSession, digidakObj, digidakDir);
                         } else {
                             logger.warn("Digidak directory not found on disk: " + digidakDir.getAbsolutePath());
                         }

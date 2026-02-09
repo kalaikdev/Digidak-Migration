@@ -22,6 +22,9 @@ if exist "java\bin\java.exe" (
 ) else if exist "..\dist\java\bin\java.exe" (
     set "JAVA_HOME=..\dist\java"
     echo Using bundled Java from ..\dist\java\ folder
+) else if exist "%ProgramFiles%\Java\jdk-17\bin\java.exe" (
+    set "JAVA_HOME=%ProgramFiles%\Java\jdk-17"
+    echo Using System JDK 17
 ) else (
     where java >nul 2>&1
     if errorlevel 1 (

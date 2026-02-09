@@ -48,7 +48,7 @@ public class DigidakExportOperation {
     public void extractSingleRecordsCSV(IDfSession session, String outputFilePath, String repoName,
             int threadCount, int timeoutHours) {
         
-        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter !='true'";
+        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=false AND bulk_letter !='true'";
         String recordsDir = "digidak_single_records";
         String csvFileName = "DigidakSingleRecords_Export.csv";
         
@@ -58,12 +58,12 @@ public class DigidakExportOperation {
 
     /**
      * Extracts Group Digidak records to CSV file.
-     * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true
+     * WHERE clause: Q1 2024 AND group_letter_id=true
      */
     public void extractGroupRecordsCSV(IDfSession session, String outputFilePath, String repoName,
             int threadCount, int timeoutHours) {
         
-        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=true";
+        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=true";
         String recordsDir = "digidak_group_records";
         String csvFileName = "DigidakGroupRecords_Export.csv";
         
@@ -73,13 +73,13 @@ public class DigidakExportOperation {
 
     /**
      * Extracts Subletter Digidak records (bulk letters) to CSV file.
-     * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'
+     * WHERE clause: Q1 2024 AND group_letter_id=false AND bulk_letter='true'
      * Note: Subletter records only export movement_register.csv (no document metadata)
      */
     public void extractSubletterRecordsCSV(IDfSession session, String outputFilePath, String repoName,
             int threadCount, int timeoutHours) {
         
-        String whereClause = "DATETOSTRING(\"r_creation_date\", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'";
+        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=false AND bulk_letter='true'";
         String recordsDir = "digidak_subletter_records";
         String csvFileName = "DigidakSubletterRecords_Export.csv";
         
@@ -106,7 +106,11 @@ public class DigidakExportOperation {
         // DQL Query for Digidak (Letter) records from source schema
         // Source type: edmapp_letter_folder
         String baseDql = "SELECT distinct r_object_id, object_name, subject, r_creator_name, r_creation_date, " +
-                "status, priority, uid_number FROM edmapp_letter_folder";
+                "status, priority, uid_number, office_type, mode_of_receipt, state_of_recipient, sent_to, " +
+                "office_region, group_letter_id, crds_flag, responded_object_id, language_type, address_of_recipient, " +
+                "sensitivity, region, ref_number, src_vertical_users, letter_no, financial_year, received_from, " +
+                "sub_type, category_external, subjects, category_type, bulk_letter, file_no, type_mode, ho_ro_te, " +
+                "from_dept_ro_te FROM edmapp_letter_folder";
 
         String dql = baseDql;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
@@ -132,7 +136,12 @@ public class DigidakExportOperation {
             // Columns to export from edmapp_letter_folder
             String[] headers = {
                     "r_object_id", "object_name", "subject", "r_creator_name", "r_creation_date",
-                    "status", "priority", "uid_number"
+                    "status", "priority", "uid_number", "office_type", "mode_of_receipt", "state_of_recipient",
+                    "sent_to", "office_region", "group_letter_id", "crds_flag", "responded_object_id",
+                    "language_type", "address_of_recipient", "sensitivity", "region", "ref_number",
+                    "src_vertical_users", "letter_no", "financial_year", "received_from", "sub_type",
+                    "category_external", "subjects", "category_type", "bulk_letter", "file_no", "type_mode",
+                    "ho_ro_te", "from_dept_ro_te"
             };
 
             // Write Headers
@@ -344,7 +353,8 @@ public class DigidakExportOperation {
 
         // DQL for movement register from source: edmapp_letter_movement_reg
         // Use letter_number to link with uid_number from edmapp_letter_folder
-        String movementDql = "SELECT r_object_id, object_name, modified_from, letter_subject, acl_name, status, letter_category " +
+        String movementDql = "SELECT r_object_id, object_name, modified_from, letter_subject, acl_name, status, letter_category, " +
+                "completion_date, letter_number, send_to " +
                 "FROM edmapp_letter_movement_reg " +
                 "WHERE letter_number='" + uidNumber + "'";
 
@@ -357,7 +367,8 @@ public class DigidakExportOperation {
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
 
             String[] headers = {
-                    "r_object_id", "object_name", "modified_from", "letter_subject", "acl_name", "status", "letter_category"
+                    "r_object_id", "object_name", "modified_from", "letter_subject", "acl_name", "status", "letter_category",
+                    "completion_date", "letter_number", "send_to"
             };
 
             writeLine(writer, headers);
