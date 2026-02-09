@@ -106,9 +106,9 @@ public class DigidakExportOperation {
         // DQL Query for Digidak (Letter) records from source schema
         // Source type: edmapp_letter_folder
         String baseDql = "SELECT distinct r_object_id, object_name, subject, r_creator_name, r_creation_date, " +
-                "status, priority, uid_number, office_type, mode_of_receipt, state_of_recipient, sent_to, " +
+                "status, priority, uid_number, mode_of_receipt, state_of_recipient, sent_to, " +
                 "office_region, group_letter_id, crds_flag, responded_object_id, language_type, address_of_recipient, " +
-                "sensitivity, region, ref_number, src_vertical_users, letter_no, financial_year, received_from, " +
+                "sensitivity, region, ref_number, letter_no, financial_year, received_from, " +
                 "sub_type, category_external, subjects, category_type, bulk_letter, file_no, type_mode, ho_ro_te, " +
                 "from_dept_ro_te FROM edmapp_letter_folder";
 
@@ -134,12 +134,13 @@ public class DigidakExportOperation {
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
 
             // Columns to export from edmapp_letter_folder
+            // Columns to export from edmapp_letter_folder
             String[] headers = {
                     "r_object_id", "object_name", "subject", "r_creator_name", "r_creation_date",
-                    "status", "priority", "uid_number", "office_type", "mode_of_receipt", "state_of_recipient",
+                    "status", "priority", "uid_number", "mode_of_receipt", "state_of_recipient",
                     "sent_to", "office_region", "group_letter_id", "crds_flag", "responded_object_id",
                     "language_type", "address_of_recipient", "sensitivity", "region", "ref_number",
-                    "src_vertical_users", "letter_no", "financial_year", "received_from", "sub_type",
+                    "letter_no", "financial_year", "received_from", "sub_type",
                     "category_external", "subjects", "category_type", "bulk_letter", "file_no", "type_mode",
                     "ho_ro_te", "from_dept_ro_te"
             };
@@ -286,51 +287,77 @@ public class DigidakExportOperation {
     /**
      * Extracts Digidak keywords to separate CSV file.
      */
-    public void extractDigidakKeywordsCSV(IDfSession session, String outputFilePath, String whereClause) {
-        String baseDql = "SELECT DISTINCT r_object_id, office_type, response_to_ioms_id, src_vertical_users, cgm_and_assigned_groups FROM edmapp_letter_folder";
+    public void extractRepeatingAttributesCSV(IDfSession session, String outputFilePath, String whereClause) {
+        // Export each repeating attribute for edmapp_letter_folder to its own CSV file
+        String[] folderAttributes = {
+            "office_type", "assigned_user", "response_to_ioms_id", "src_vertical_users",
+            "assigned_vertical", "assigned_vertical_group", "endorse_object_id",
+            "cgm_and_assigned_groups", "vertical_head_user", "vertical_head_group",
+            "vertical_users", "ddm_vertical_users", "document_comments", "efd_comments"
+        };
 
-        String dql = baseDql;
+        for (String attr : folderAttributes) {
+            exportRepeatingAttribute(session, outputFilePath, whereClause, "edmapp_letter_folder", attr);
+        }
+
+        // Export repeating attribute for edmapp_letter_movement_reg
+        // We need to link back to the folder to return only relevant records based on the date filter
+        // The link is: edmapp_letter_movement_reg.letter_number = edmapp_letter_folder.uid_number
+        String movementWhereClause = "letter_number IN (SELECT uid_number FROM edmapp_letter_folder WHERE " + whereClause + ")";
+        exportRepeatingAttribute(session, outputFilePath, movementWhereClause, "edmapp_letter_movement_reg", "send_to");
+    }
+
+    /**
+     * Exports a single repeating attribute to a CSV file.
+     */
+    private void exportRepeatingAttribute(IDfSession session, String outputBasePath, String whereClause, String typeName, String attributeName) {
+        String dql = "SELECT r_object_id, " + attributeName + " FROM " + typeName;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
             dql += " WHERE " + whereClause;
         }
         dql += " ENABLE (ROW_BASED)";
 
-        logger.info("Executing Keywords Query: " + dql);
+        logger.info("Exporting repeating attribute: " + attributeName);
+        logger.debug("Executing Query: " + dql);
 
-        File mainExportDir = new File(outputFilePath);
+        File mainExportDir = new File(outputBasePath);
         if (!mainExportDir.exists()) {
             mainExportDir.mkdirs();
         }
-        File keywordsFile = new File(mainExportDir, "DigidakRepeating_Export.csv");
+        File outputFile = new File(mainExportDir, "repeating_" + attributeName + ".csv");
 
         IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(keywordsFile))) {
-
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
             IDfQuery query = new DfQuery();
             query.setDQL(dql);
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
 
-            String[] headers = { "r_object_id", "office_type", "response_to_ioms_id", "src_vertical_users", "cgm_and_assigned_groups" };
+            // Header: r_object_id, [attribute_name]
+            String[] headers = { "r_object_id", attributeName };
             writeLine(writer, headers);
 
             int count = 0;
             while (collection.next()) {
                 List<String> row = new ArrayList<>();
-                for (String header : headers) {
-                    String val = "";
-                    if (collection.hasAttr(header)) {
-                        val = collection.getString(header);
-                    }
-                    row.add(val);
+                // r_object_id
+                row.add(collection.getString("r_object_id"));
+                
+                // attribute value
+                String val = "";
+                if (collection.hasAttr(attributeName)) {
+                    // Start: check if repeating
+                   // But since we selected it directly, just getString usually gets the current row value in ROW_BASED query
+                   val = collection.getString(attributeName);
                 }
+                row.add(val);
 
                 writeLine(writer, row.toArray(new String[0]));
                 count++;
             }
-            logger.info("Exported " + count + " keyword rows to " + keywordsFile.getAbsolutePath());
+            logger.info("Exported " + count + " rows for attribute " + attributeName + " to " + outputFile.getName());
 
         } catch (DfException | IOException e) {
-            logger.error("Error in extractDigidakKeywordsCSV", e);
+            logger.error("Error in exportRepeatingAttribute for " + attributeName, e);
         } finally {
             if (collection != null) {
                 try {
@@ -356,7 +383,7 @@ public class DigidakExportOperation {
         // DQL for movement register from source: edmapp_letter_movement_reg
         // Use letter_number to link with uid_number from edmapp_letter_folder
         String movementDql = "SELECT r_object_id, object_name, modified_from, letter_subject, acl_name, status, letter_category, " +
-                "completion_date, letter_number, send_to " +
+                "completion_date, letter_number " +
                 "FROM edmapp_letter_movement_reg " +
                 "WHERE letter_number='" + uidNumber + "'";
 
@@ -370,7 +397,7 @@ public class DigidakExportOperation {
 
             String[] headers = {
                     "r_object_id", "object_name", "modified_from", "letter_subject", "acl_name", "status", "letter_category",
-                    "completion_date", "letter_number", "send_to"
+                    "completion_date", "letter_number"
             };
 
             writeLine(writer, headers);
@@ -616,8 +643,8 @@ public class DigidakExportOperation {
             // Run Export
             DigidakExportOperation exporter = new DigidakExportOperation();
             
-            // Export keywords
-            exporter.extractDigidakKeywordsCSV(session, exportPath, whereClause);
+            // Export Repeating Attributes
+            exporter.extractRepeatingAttributesCSV(session, exportPath, whereClause);
             
             // Export Single Records (non-bulk, non-group letters)
             // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true AND bulk_letter !='true'

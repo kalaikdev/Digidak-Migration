@@ -1,47 +1,45 @@
 # Session Summary - Digidak Migration Export Updates
-**Date:** February 9, 2026
-**Time:** 17:52 IST
+**Date:** February 10, 2026
+**Time:** 03:15 IST
 
 ## 1. Objective
-Refine the **Digidak Export Operation** to target a specific date range for data extraction. The goal was to filter and export records created between **May 1st, 2024** and **May 2nd, 2024**, ensuring the correct data subset is prepared for migration.
+Refine the **Digidak Export Operation** to target a specific date range (May 1st - May 2nd, 2024), handle an expanded list of repeating attributes via separate CSV files, and clean up the main export queries.
 
 ## 2. Key Changes & Actions Taken
-
-### A. Configuration Updates
+### A. Config & Date Filtering
 *   **File:** `config-Export/application.properties`
-*   **Action:** Updated the `query.where.clause` to filter records by creation date.
-*   **Old Value:** `(r_creation_date >= DATE('01/01/2024','mm/dd/yyyy') ...)`
-*   **New Value:** `(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy'))`
+*   **Status:** Creation date filter (`05/01/2024` - `05/02/2024`) applied across all record types.
 
-### B. Code Logic Updates
-*   **File:** `src/main/java/com/nabard/digidak/migration/DigidakExportOperation.java`
-*   **Action:** Updated hardcoded WHERE clauses in the following methods to match the configuration date range:
-    *   `extractSingleRecordsCSV` (Single/Individual Records)
-    *   `extractGroupRecordsCSV` (Group Records)
-    *   `extractSubletterRecordsCSV` (Bulk/Subletter Records)
-*   **Logic:** Ensured all three export types respect the **05/01/2024 to 05/02/2024** date window.
+### B. Repeating Attributes Strategy (Cartesian Product Fix)
+*   **Problem:** Exporting multiple repeating attributes in one query causes data duplication.
+*   **Solution:** Removed `extractDigidakKeywordsCSV`. Replaced with `extractRepeatingAttributesCSV` which exports each attribute to its own file.
+*   **Attributes Handled:**
+    *   **From edmapp_letter_folder:**
+        *   `office_type`, `assigned_user`, `response_to_ioms_id`, `src_vertical_users`
+        *   `assigned_vertical`, `assigned_vertical_group`, `endorse_object_id`
+        *   `cgm_and_assigned_groups`, `vertical_head_user`, `vertical_head_group`
+        *   `vertical_users`, `ddm_vertical_users`, `document_comments`, `efd_comments`
+    *   **From edmapp_letter_movement_reg:**
+        *   `send_to` (Filtered by subquery to match folder date range)
 
-### C. Build & Compilation
+### C. Main Export Query Cleanup
+*   **Removed Repeating Columns:** To avoid duplication in master CSV files, the following columns were removed from the main SELECT queries:
+    *   `office_type`, `src_vertical_users` (from `extractRecordsInternal`)
+    *   `send_to` (from `exportMovementRegister`)
+
+### D. Build Status
 *   **Command:** `mvn clean compile`
-*   **Status:** **SUCCESS**
-*   **Result:** The project was successfully recompiled, generating updated `.class` files in the `target/classes` directory.
+*   **Result:** **SUCCESS**. Project is up-to-date.
 
-## 3. Current State
-*   **Export Date Range:** `05/01/2024` to `05/02/2024` (inclusive).
-*   **Target Records:**
-    1.  **Single Records** (Non-bulk, Non-group)
-    2.  **Group Records**
-    3.  **Subletter Records** (Movement Register only, no content)
+## 3. Current Output Structure
+Path: `C:/DigidakMigration/UAT Export Digidak/`
 
-## 4. Output Structure
-The export operation (when run) will generate the following structure in `C:/DigidakMigration/UAT Export Digidak`:
+*   **Master Records:**
+    *   `DigidakSingleRecords_Export.csv` (With Movement & Docs)
+    *   `DigidakGroupRecords_Export.csv` (Docs only, NO Movement)
+    *   `DigidakSubletterRecords_Export.csv` (Movement only, NO Docs)
+*   **Repeating Data:** `repeating_office_type.csv`, `repeating_src_vertical_users.csv`, ... (15 separate files)
 
-*   `DigidakSingleRecords_Export.csv` & `digidak_single_records/`
-*   `DigidakGroupRecords_Export.csv` & `digidak_group_records/`
-*   `DigidakSubletterRecords_Export.csv` & `digidak_subletter_records/`
-*   `DigidakRepeating_Export.csv` (Keywords)
-
-## 5. Next Steps
-1.  **Run Export:** Execute `run-export.bat` to perform the export operation.
-2.  **Verify Output:** Check the generated CSV files and folders in the export path to confirm the data matches the expected time range.
-3.  **Proceed to Import:** Once verified, use the exported data for the import process.
+## 4. Next Steps
+1.  **Execute Export:** Run `run-export.bat`.
+2.  **Update Import Logic:** Modify `DigidakImportOperation.java` to ingest the new `repeating_*.csv` files and use `appendString` to populate multi-valued fields in the target repository.
