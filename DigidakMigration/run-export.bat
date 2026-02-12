@@ -37,10 +37,13 @@ if exist "java\bin\java.exe" (
 )
 
 REM Set classpath - using config-Export for legacy repository settings
-set "CLASSPATH=config-Export;target\classes;D:\kalai\Shared\*"
+REM Build classpath with all JARs from Shared folder
+set "CLASSPATH=config-Export;target\classes"
+for %%i in (..\Shared\*.jar) do set "CLASSPATH=!CLASSPATH!;%%i"
 
 echo.
 echo Configuration: config-Export (Legacy Repository)
+echo Classpath: !CLASSPATH!
 echo Starting Digidak Export...
 echo.
 
