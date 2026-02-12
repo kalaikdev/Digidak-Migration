@@ -1,0 +1,50 @@
+Update the metadata from csv file based on below inputs.
+
+For cms_digidak_folder:
+subjects to letter_subject
+priority to priority
+uid_number to uid_number
+r_creator_name to initiator
+r_creation_date to r_creation_date
+mode_of_receipt to mode_of_receipt
+state_of_recipient to state_of_sender
+sent_to to decision
+office_region to selected_region
+group_letter_id to is_group
+language_type to languages
+address_of_recipient to address_of_sender
+sensitivity to secrecy
+region to region
+letter_no to letter_no
+financial_year to financial_year
+received_from to received_from
+sub_type to nature_of_correspondence
+category_external to received_from
+category_type to type_category
+file_no to file_number
+bulk_letter to is_bulk_letter
+type_mode to entry_type
+ho_ro_te to login_office_type
+from_dept_ro_te to login_region
+r_object_id to migrated_id
+and always set status=Closed and is_migrated=true
+
+For cms_digidak_movement_re:
+status to status
+letter_subject to letter_subject 
+completion_date to completed_date
+modified_from to performer
+letter_category to type_category
+r_creator_name to r_creator_name
+r_object_id to migrated_id
+and always set is_migrated=true
+
+For cms_digidak_document:
+category to document_type
+object_name to object_name
+title to uid_number
+r_object_id to migrated_id
+and always set is_migrated=true
+
+
+

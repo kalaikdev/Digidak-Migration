@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export PATH=\"/c/tools/apache-maven-3.9.6/bin:$PATH\")",
+      "Bash(mvn clean compile:*)",
+      "Bash(java:*)",
+      "Bash(\"C:\\\\tools\\\\apache-maven-3.9.6\\\\bin\\\\mvn.cmd\" clean package assembly:single -DskipTests)",
+      "Bash(javac:*)"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+This is a documentum dfc based project
+dfc.properties files are at config/ folder
+all the required jars are at /libs folder
+Sample docs are at DigidakMetadata_Export folder
+    1. digidak_single_records folder and digidak_group_records folder will get import in \Digidak Legacy cabinet
+    2. digidak_subletter_records folder will import under respective group_records folder
+    3. Respective document will get import to single records and group records. And document will not upload to subletters.
+    4. movement register will get create for single records and subletters.
+    5. r_object_id of the folder created in step 1 and 2 is the i_folder_id for movement register creating in step 4
+
+
+Create Java standalone project based on dfc
+Documentum Repository schema is placed under /DocumentumSchema
+Read the object type schema from the above folder
+
+
+this project is for bulk import of DigiDak contents inside the repository.
+1. It should import documents as per below logic and assign metadata and ACLs to the documents
+2. Metadata is at document_metadata.csv
+3. Applying ACL should follow this logic
+     Apply parent folder acl for the document (means either single folder or group folder)
+
+In documentum we have repeating attribute concept. While importing the data, repeating attributes should get update/append properly
+
+Coding principles (core principles)
+1. Use concurrency
+2. Use production ready code
+3. Write test cases
+4. Focus on performance as we are doing bulk migration
