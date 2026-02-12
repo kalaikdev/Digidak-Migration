@@ -10,6 +10,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -505,7 +507,7 @@ public class FolderService {
                             attributes.put("initiator", values[rCreatorNameIndex].trim());
                         }
                         if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length && !values[rCreationDateIndex].trim().isEmpty()) {
-                            attributes.put("r_creation_date", values[rCreationDateIndex].trim());
+                            attributes.put("r_creation_date", convertDateFormat(values[rCreationDateIndex].trim()));
                         }
                         if (modeOfReceiptIndex >= 0 && modeOfReceiptIndex < values.length && !values[modeOfReceiptIndex].trim().isEmpty()) {
                             attributes.put("mode_of_receipt", values[modeOfReceiptIndex].trim());
@@ -575,7 +577,7 @@ public class FolderService {
                             attributes.put("case_number", values[letterCaseNumberIndex].trim());
                         }
                         if (dateOfReceiptIndex >= 0 && dateOfReceiptIndex < values.length && !values[dateOfReceiptIndex].trim().isEmpty()) {
-                            attributes.put("entry_date", values[dateOfReceiptIndex].trim());
+                            attributes.put("entry_date", convertDateFormat(values[dateOfReceiptIndex].trim()));
                         }
                         if (fowardGroupIdIndex >= 0 && fowardGroupIdIndex < values.length && !values[fowardGroupIdIndex].trim().isEmpty()) {
                             attributes.put("forward_group_uid", values[fowardGroupIdIndex].trim());
@@ -767,6 +769,33 @@ public class FolderService {
             }
         } else {
             logger.debug("No {} values found for migrated_id: {}", sourceColumn, migratedId);
+        }
+    }
+
+    /**
+     * Convert date from DD/MM/YYYY format to MM/DD/YYYY format
+     * Input: "22/04/2024, 12:00:00 AM" (DD/MM/YYYY)
+     * Output: "4/22/2024, 12:00:00 AM" (MM/DD/YYYY)
+     */
+    private String convertDateFormat(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return dateStr;
+        }
+
+        try {
+            // Parse DD/MM/YYYY format
+            SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a");
+            Date date = inputFormat.parse(dateStr.trim());
+
+            // Format as MM/DD/YYYY
+            SimpleDateFormat outputFormat = new SimpleDateFormat("M/d/yyyy, h:mm:ss a");
+            String converted = outputFormat.format(date);
+            logger.debug("Converted date from '{}' to '{}'", dateStr, converted);
+            return converted;
+        } catch (Exception e) {
+            logger.warn("Failed to convert date format for '{}': {}. Using original value.",
+                       dateStr, e.getMessage());
+            return dateStr;
         }
     }
 }

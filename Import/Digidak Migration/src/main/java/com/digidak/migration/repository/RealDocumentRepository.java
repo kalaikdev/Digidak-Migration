@@ -33,11 +33,13 @@ public class RealDocumentRepository {
         try {
             logger.debug("Creating document: {}", metadata.getObjectName());
 
-            // Get object type, default to dm_document if not specified
+            // Use specified object type, or default to cms_digidak_document for regular documents
+            // (source system type edmapp_letter_document doesn't exist in target)
             String objectType = metadata.getrObjectType();
-            if (objectType == null || objectType.trim().isEmpty()) {
-                objectType = "dm_document";
+            if (objectType == null || objectType.trim().isEmpty() || objectType.equals("edmapp_letter_document")) {
+                objectType = "cms_digidak_document";
             }
+            logger.debug("Using document type: {}", objectType);
 
             // Create new document using DFC
             IDfPersistentObject document = session.newObject(objectType);
