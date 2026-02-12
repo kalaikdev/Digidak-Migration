@@ -1,0 +1,38 @@
+[INFO] Scanning for projects...
+[WARNING] 
+[WARNING] Some problems were encountered while building the effective model for com.nabard:digidak-migration-util:jar:1.0-SNAPSHOT
+[WARNING] 'dependencies.dependency.systemPath' for com.documentum:dfc:jar should not point at files within the project directory, ${project.basedir}/../Shared/dfc.jar will be unresolvable by dependent projects @ line 26, column 25
+[WARNING] 'dependencies.dependency.systemPath' for commons-lang:commons-lang:jar should not point at files within the project directory, ${project.basedir}/../Shared/commons-lang-2.6.jar will be unresolvable by dependent projects @ line 35, column 26
+[WARNING] 'dependencies.dependency.systemPath' for log4j:log4j:jar should not point at files within the project directory, ${project.basedir}/../Shared/log4j-1.2-api-2.13.3.jar will be unresolvable by dependent projects @ line 43, column 25
+[WARNING] 'dependencies.dependency.systemPath' for org.apache.logging.log4j:log4j-core:jar should not point at files within the project directory, ${project.basedir}/../Shared/log4j-core-2.13.3.jar will be unresolvable by dependent projects @ line 51, column 25
+[WARNING] 'dependencies.dependency.systemPath' for org.apache.logging.log4j:log4j-api:jar should not point at files within the project directory, ${project.basedir}/../Shared/log4j-api-2.13.3.jar will be unresolvable by dependent projects @ line 59, column 25
+[WARNING] 
+[WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[WARNING] 
+[WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[WARNING] 
+[INFO] 
+[INFO] -----------------< com.nabard:digidak-migration-util >------------------
+[INFO] Building Digidak Migration Utility 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ digidak-migration-util ---
+[INFO] Deleting D:\NB Digidak Migration\DigidakMigration\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ digidak-migration-util ---
+[INFO] Copying 4 resources from config to target\classes
+[INFO] skip non existing resourceDirectory D:\NB Digidak Migration\DigidakMigration\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ digidak-migration-util ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 3 source files with javac [debug target 11] to target\classes
+[WARNING] system modules path not set in conjunction with -source 11
+[INFO] /D:/NB Digidak Migration/DigidakMigration/src/main/java/com/nabard/digidak/migration/DigidakImportOperation.java: D:\NB Digidak Migration\DigidakMigration\src\main\java\com\nabard\digidak\migration\DigidakImportOperation.java uses or overrides a deprecated API.
+[INFO] /D:/NB Digidak Migration/DigidakMigration/src/main/java/com/nabard/digidak/migration/DigidakImportOperation.java: Recompile with -Xlint:deprecation for details.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.180 s
+[INFO] Finished at: 2026-02-12T23:12:33+05:30
+[INFO] ------------------------------------------------------------------------
