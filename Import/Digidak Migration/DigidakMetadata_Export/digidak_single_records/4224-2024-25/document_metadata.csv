@@ -1,2 +1,2 @@
-r_object_id,object_name,r_object_type,i_folder_id,r_folder_path,r_creator_name,r_creation_date,document_type
-0902cba082e13b0c,Keonjhar CCB.pdf,cms_digidak_document,0b02cba082e13b24,/Letter/4224-2024-25,Binodini Behera,"01/05/2024, 11:58:47 AM",Main Letter
+r_object_id,object_name,r_object_type,i_folder_id,r_folder_path,r_creator_name,r_creation_date,document_type,title
+0902cba082e13b0c,Keonjhar CCB.pdf,edmapp_letter_document,0b02cba082e13b24,/Letter/4224-2024-25,Binodini Behera,"01/05/2024, 11:58:47 AM",Main Letter,4224/2024-25
