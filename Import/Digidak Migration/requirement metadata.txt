@@ -36,6 +36,7 @@ completion_date to completed_date
 modified_from to performer
 letter_category to type_category
 r_creator_name to r_creator_name
+send_to to assigned_user
 r_object_id to migrated_id
 and always set is_migrated=true
 

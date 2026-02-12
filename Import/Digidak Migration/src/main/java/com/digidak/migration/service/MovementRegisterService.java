@@ -180,6 +180,12 @@ public class MovementRegisterService {
                     // Create in repository
                     String registerId = documentRepository.createDocument(registerMetadata, folderId);
                     documentRepository.setMetadata(registerId, registerMetadata);
+
+                    // Set repeating assigned_user attribute from repeating_send_to.csv
+                    if (objectId != null && !objectId.isEmpty()) {
+                        setRepeatingAssignedUsers(registerId, objectId); // objectId is set as migrated_id
+                    }
+
                     documentRepository.save(registerId);
 
                     registerCount++;
@@ -292,5 +298,81 @@ public class MovementRegisterService {
             logger.warn("Error finding subletter folder {}: {}", folderName, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Set repeating assigned_user attribute from repeating_send_to.csv
+     * Per requirements: send_to -> assigned_user (repeating attribute)
+     * Matches on migrated_id column (falls back to r_object_id for backward compatibility)
+     */
+    private void setRepeatingAssignedUsers(String registerId, String migratedId) throws Exception {
+        logger.debug("Setting repeating assigned_user for movement register: {} (migrated_id: {})",
+                     registerId, migratedId);
+
+        // Read repeating_send_to.csv file
+        String csvPath = config.getDataExportPath() + "/repeating_send_to.csv";
+        File csvFile = new File(csvPath);
+
+        if (!csvFile.exists()) {
+            logger.warn("repeating_send_to.csv not found: {}", csvPath);
+            return;
+        }
+
+        java.util.List<String> assignedUsers = new java.util.ArrayList<>();
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+
+            // Read header
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return;
+            }
+
+            // Find column indices - check for migrated_id first, fallback to r_object_id
+            int migratedIdIndex = findColumnIndex(headers, "migrated_id");
+            if (migratedIdIndex < 0) {
+                migratedIdIndex = findColumnIndex(headers, "r_object_id");
+                logger.debug("Using r_object_id column for matching (migrated_id column not found)");
+            } else {
+                logger.debug("Using migrated_id column for matching");
+            }
+            int sendToIndex = findColumnIndex(headers, "send_to");
+
+            if (migratedIdIndex < 0 || sendToIndex < 0) {
+                logger.warn("Required columns not found in repeating_send_to.csv (need migrated_id/r_object_id and send_to)");
+                csvReader.close();
+                return;
+            }
+
+            // Read all rows and collect assigned users for this migrated_id
+            String[] values;
+            while ((values = csvReader.readNext()) != null) {
+                if (values.length > Math.max(migratedIdIndex, sendToIndex)) {
+                    String rowMigratedId = values[migratedIdIndex].trim();
+                    if (migratedId.equals(rowMigratedId)) {
+                        String sendTo = values[sendToIndex].trim();
+                        if (!sendTo.isEmpty()) {
+                            assignedUsers.add(sendTo);
+                            logger.debug("Found assigned user for migrated_id {}: {}", migratedId, sendTo);
+                        }
+                    }
+                }
+            }
+            csvReader.close();
+        } catch (Exception e) {
+            logger.error("Error reading repeating_send_to.csv: {}", e.getMessage(), e);
+            throw e;
+        }
+
+        // Set repeating assigned_user attribute if we found any users
+        if (!assignedUsers.isEmpty()) {
+            documentRepository.setRepeatingAttribute(registerId, "assigned_user", assignedUsers);
+            logger.info("Set {} assigned user(s) for movement register with migrated_id {}",
+                       assignedUsers.size(), migratedId);
+        } else {
+            logger.debug("No assigned users found for migrated_id: {}", migratedId);
+        }
     }
 }

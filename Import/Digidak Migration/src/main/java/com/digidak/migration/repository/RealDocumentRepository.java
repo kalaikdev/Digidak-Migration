@@ -3,6 +3,7 @@ package com.digidak.migration.repository;
 import com.digidak.migration.model.DocumentMetadata;
 import com.documentum.fc.client.IDfSession;
 import com.documentum.fc.client.IDfPersistentObject;
+import com.documentum.fc.client.IDfSysObject;
 import com.documentum.fc.common.DfId;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -124,15 +125,20 @@ public class RealDocumentRepository {
                         contentFile.getAbsolutePath());
             }
 
-            IDfPersistentObject document = session.getObject(new DfId(documentId));
+            IDfSysObject document = (IDfSysObject) session.getObject(new DfId(documentId));
             if (document == null) {
                 throw new Exception("Document not found: " + documentId);
             }
 
-            // Set content using setFile method
-            document.setString("a_content_type", getContentType(contentFile.getName()));
+            // Set content type
+            String contentType = getContentType(contentFile.getName());
+            document.setContentType(contentType);
 
-            logger.debug("Content set successfully for document: {}", documentId);
+            // Upload file content using DFC setFile method
+            document.setFile(contentFile.getAbsolutePath());
+
+            logger.info("Content uploaded successfully for document: {} ({})",
+                       documentId, contentFile.getName());
         } finally {
             sessionManager.releaseSession(session);
         }
@@ -257,5 +263,51 @@ public class RealDocumentRepository {
      */
     public void clearCache() {
         // No-op for real repository
+    }
+
+    /**
+     * Set repeating attribute with multiple values
+     * Used for attributes that can have multiple values (e.g., assigned_user)
+     */
+    public void setRepeatingAttribute(String documentId, String attributeName,
+                                     java.util.List<String> values) throws Exception {
+        IDfSession session = sessionManager.getSession();
+        try {
+            logger.debug("Setting repeating attribute {} for document: {}", attributeName, documentId);
+
+            IDfSysObject document = (IDfSysObject) session.getObject(new DfId(documentId));
+            if (document == null) {
+                throw new Exception("Document not found: " + documentId);
+            }
+
+            // Check if attribute is actually repeating
+            if (!document.isAttrRepeating(attributeName)) {
+                logger.warn("Attribute {} is not defined as repeating, setting first value only", attributeName);
+                if (!values.isEmpty()) {
+                    document.setString(attributeName, values.get(0));
+                }
+                return;
+            }
+
+            // Clear existing values first
+            int count = document.getValueCount(attributeName);
+            for (int i = count - 1; i >= 0; i--) {
+                document.remove(attributeName, i);
+            }
+
+            // Append new values
+            for (String value : values) {
+                if (value != null && !value.trim().isEmpty()) {
+                    document.appendString(attributeName, value.trim());
+                    logger.debug("Appended value to {}: {}", attributeName, value);
+                }
+            }
+
+            logger.info("Set {} value(s) for repeating attribute {} on document {}",
+                       values.size(), attributeName, documentId);
+
+        } finally {
+            sessionManager.releaseSession(session);
+        }
     }
 }
