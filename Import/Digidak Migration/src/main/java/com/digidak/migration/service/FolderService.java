@@ -465,6 +465,17 @@ public class FolderService {
             int typeModeIndex = findColumnIndex(headers, "type_mode");
             int hoRoTeIndex = findColumnIndex(headers, "ho_ro_te");
             int fromDeptRoTeIndex = findColumnIndex(headers, "from_dept_ro_te");
+            int verticalHeadGroupIndex = findColumnIndex(headers, "vertical_head_group");
+            int endorseGroupIdIndex = findColumnIndex(headers, "endorse_group_id");
+            int letterCaseNumberIndex = findColumnIndex(headers, "letter_case_number");
+            int dateOfReceiptIndex = findColumnIndex(headers, "date_of_receipt");
+            int fowardGroupIdIndex = findColumnIndex(headers, "foward_group_id");
+            int inwardRefNumberIndex = findColumnIndex(headers, "inward_ref_number");
+            int isEndorsedIndex = findColumnIndex(headers, "is_endorsed");
+            int isForwardIndex = findColumnIndex(headers, "is_forward");
+            int assignedCgmGroupIndex = findColumnIndex(headers, "assigned_cgm_group");
+            int dueDateActionIndex = findColumnIndex(headers, "due_date_action");
+            int isDdmIndex = findColumnIndex(headers, "is_ddm");
             int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
 
             // Read data rows
@@ -543,7 +554,7 @@ public class FolderService {
                             attributes.put("file_number", values[fileNoIndex].trim());
                         }
                         if (bulkLetterIndex >= 0 && bulkLetterIndex < values.length && !values[bulkLetterIndex].trim().isEmpty()) {
-                            attributes.put("is_bulk_letter", values[bulkLetterIndex].trim());
+                            attributes.put("is_bulk_letter", values[bulkLetterIndex].trim().toLowerCase());
                         }
                         if (typeModeIndex >= 0 && typeModeIndex < values.length && !values[typeModeIndex].trim().isEmpty()) {
                             attributes.put("entry_type", values[typeModeIndex].trim());
@@ -553,6 +564,40 @@ public class FolderService {
                         }
                         if (fromDeptRoTeIndex >= 0 && fromDeptRoTeIndex < values.length && !values[fromDeptRoTeIndex].trim().isEmpty()) {
                             attributes.put("login_region", values[fromDeptRoTeIndex].trim());
+                        }
+                        if (verticalHeadGroupIndex >= 0 && verticalHeadGroupIndex < values.length && !values[verticalHeadGroupIndex].trim().isEmpty()) {
+                            attributes.put("vertical_head_display_name", values[verticalHeadGroupIndex].trim());
+                        }
+                        if (endorseGroupIdIndex >= 0 && endorseGroupIdIndex < values.length && !values[endorseGroupIdIndex].trim().isEmpty()) {
+                            attributes.put("endorse_uid", values[endorseGroupIdIndex].trim());
+                        }
+                        if (letterCaseNumberIndex >= 0 && letterCaseNumberIndex < values.length && !values[letterCaseNumberIndex].trim().isEmpty()) {
+                            attributes.put("case_number", values[letterCaseNumberIndex].trim());
+                        }
+                        if (dateOfReceiptIndex >= 0 && dateOfReceiptIndex < values.length && !values[dateOfReceiptIndex].trim().isEmpty()) {
+                            attributes.put("entry_date", values[dateOfReceiptIndex].trim());
+                        }
+                        if (fowardGroupIdIndex >= 0 && fowardGroupIdIndex < values.length && !values[fowardGroupIdIndex].trim().isEmpty()) {
+                            attributes.put("forward_group_uid", values[fowardGroupIdIndex].trim());
+                        }
+                        if (inwardRefNumberIndex >= 0 && inwardRefNumberIndex < values.length && !values[inwardRefNumberIndex].trim().isEmpty()) {
+                            attributes.put("inward_ref_number", values[inwardRefNumberIndex].trim());
+                        }
+                        if (isEndorsedIndex >= 0 && isEndorsedIndex < values.length && !values[isEndorsedIndex].trim().isEmpty()) {
+                            attributes.put("is_endorsed", values[isEndorsedIndex].trim());
+                            attributes.put("is_endorsed_letter", values[isEndorsedIndex].trim()); // Same source, different target
+                        }
+                        if (isForwardIndex >= 0 && isForwardIndex < values.length && !values[isForwardIndex].trim().isEmpty()) {
+                            attributes.put("is_forward", values[isForwardIndex].trim());
+                        }
+                        if (assignedCgmGroupIndex >= 0 && assignedCgmGroupIndex < values.length && !values[assignedCgmGroupIndex].trim().isEmpty()) {
+                            attributes.put("selected_cgm_group", values[assignedCgmGroupIndex].trim());
+                        }
+                        if (dueDateActionIndex >= 0 && dueDateActionIndex < values.length && !values[dueDateActionIndex].trim().isEmpty()) {
+                            attributes.put("due_date", values[dueDateActionIndex].trim());
+                        }
+                        if (isDdmIndex >= 0 && isDdmIndex < values.length && !values[isDdmIndex].trim().isEmpty()) {
+                            attributes.put("is_ddm", values[isDdmIndex].trim());
                         }
                         if (rObjectIdIndex >= 0 && rObjectIdIndex < values.length && !values[rObjectIdIndex].trim().isEmpty()) {
                             attributes.put("migrated_id", values[rObjectIdIndex].trim());
@@ -565,6 +610,13 @@ public class FolderService {
                         // Set metadata
                         folderRepository.setFolderMetadata(folderId, attributes);
                         logger.debug("Set metadata for folder: {} [{}]", folderName, folderId);
+
+                        // Set repeating attributes from separate CSV files
+                        String migratedId = (rObjectIdIndex >= 0 && rObjectIdIndex < values.length)
+                                ? values[rObjectIdIndex].trim() : null;
+                        if (migratedId != null && !migratedId.isEmpty()) {
+                            setRepeatingAttributes(folderId, migratedId);
+                        }
                     }
                 }
             }
@@ -611,5 +663,110 @@ public class FolderService {
             }
         }
         return -1;
+    }
+
+    /**
+     * Set repeating attributes for a folder from separate CSV files
+     * Per requirements:
+     * - office_type -> source_vertical
+     * - response_to_ioms_id -> responding_uid
+     * - vertical_users -> vertical_users
+     * - ddm_vertical_users -> ddm_users
+     * - workflow_users -> workflow_groups
+     */
+    private void setRepeatingAttributes(String folderId, String migratedId) {
+        logger.debug("Setting repeating attributes for folder: {} (migrated_id: {})",
+                     folderId, migratedId);
+
+        // Set each repeating attribute from its respective CSV file
+        setRepeatingAttribute(folderId, migratedId, "repeating_office_type.csv",
+                             "office_type", "source_vertical");
+        setRepeatingAttribute(folderId, migratedId, "repeating_response_to_ioms_id.csv",
+                             "response_to_ioms_id", "responding_uid");
+        setRepeatingAttribute(folderId, migratedId, "repeating_vertical_users.csv",
+                             "vertical_users", "vertical_users");
+        setRepeatingAttribute(folderId, migratedId, "repeating_ddm_vertical_users.csv",
+                             "ddm_vertical_users", "ddm_users");
+        setRepeatingAttribute(folderId, migratedId, "repeating_workflow_users.csv",
+                             "workflow_users", "workflow_groups");
+    }
+
+    /**
+     * Set a single repeating attribute from a CSV file
+     */
+    private void setRepeatingAttribute(String folderId, String migratedId,
+                                       String csvFileName, String sourceColumn,
+                                       String targetAttribute) {
+        String csvPath = config.getDataExportPath() + "/" + csvFileName;
+        File csvFile = new File(csvPath);
+
+        if (!csvFile.exists()) {
+            logger.debug("{} not found, skipping repeating attribute: {}",
+                        csvFileName, targetAttribute);
+            return;
+        }
+
+        java.util.List<String> values = new java.util.ArrayList<>();
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+
+            // Read header
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return;
+            }
+
+            // Find column indices - check for migrated_id first, fallback to r_object_id
+            int migratedIdIndex = findColumnIndex(headers, "migrated_id");
+            if (migratedIdIndex < 0) {
+                migratedIdIndex = findColumnIndex(headers, "r_object_id");
+                logger.debug("Using r_object_id column for matching in {} (migrated_id column not found)",
+                            csvFileName);
+            }
+            int valueIndex = findColumnIndex(headers, sourceColumn);
+
+            if (migratedIdIndex < 0 || valueIndex < 0) {
+                logger.warn("Required columns not found in {} (need migrated_id/r_object_id and {})",
+                           csvFileName, sourceColumn);
+                csvReader.close();
+                return;
+            }
+
+            // Read all rows and collect values for this migrated_id
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                if (row.length > Math.max(migratedIdIndex, valueIndex)) {
+                    String rowMigratedId = row[migratedIdIndex].trim();
+                    if (migratedId.equals(rowMigratedId)) {
+                        String value = row[valueIndex].trim();
+                        if (!value.isEmpty()) {
+                            values.add(value);
+                            logger.debug("Found {} value for migrated_id {}: {}",
+                                       sourceColumn, migratedId, value);
+                        }
+                    }
+                }
+            }
+            csvReader.close();
+        } catch (Exception e) {
+            logger.warn("Error reading {}: {}", csvFileName, e.getMessage());
+            return;
+        }
+
+        // Set repeating attribute if we found any values
+        if (!values.isEmpty()) {
+            try {
+                folderRepository.setRepeatingAttribute(folderId, targetAttribute, values);
+                logger.info("Set {} value(s) for repeating attribute {} on folder with migrated_id {}",
+                           values.size(), targetAttribute, migratedId);
+            } catch (Exception e) {
+                logger.warn("Failed to set repeating attribute {}: {}",
+                           targetAttribute, e.getMessage());
+            }
+        } else {
+            logger.debug("No {} values found for migrated_id: {}", sourceColumn, migratedId);
+        }
     }
 }

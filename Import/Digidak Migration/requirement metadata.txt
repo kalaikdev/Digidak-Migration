@@ -26,8 +26,30 @@ bulk_letter to is_bulk_letter
 type_mode to entry_type
 ho_ro_te to login_office_type
 from_dept_ro_te to login_region
+vertical_head_group to vertical_head_display_name
+endorse_group_id to endorse_uid
+letter_case_number to case_number
+date_of_receipt to entry_date
+file_no to file_number
+foward_group_id to forward_group_uid
+inward_ref_number to inward_ref_number
+is_endorsed to is_endorsed
+is_endorsed to is_endorsed_letter
+is_forward to is_forward
+group_letter_id to is_group
+assigned_cgm_group to selected_cgm_group
+due_date_action to due_date
+is_ddm to is_ddm
 r_object_id to migrated_id
 and always set status=Closed and is_migrated=true
+
+
+Below are the repeating attributes for cms_digidak_folder:
+office_type to source_vertical
+response_to_ioms_id to responding_uid
+vertical_users to vertical_users
+ddm_vertical_users to ddm_users
+workflow_users to workflow_groups
 
 For cms_digidak_movement_re:
 status to status

@@ -217,6 +217,51 @@ public class RealFolderRepository {
     }
 
     /**
+     * Set repeating attribute for a folder
+     * Uses DFC's appendString() method for multi-value attributes
+     */
+    public void setRepeatingAttribute(String folderId, String attributeName,
+                                     java.util.List<String> values) throws Exception {
+        IDfSession session = sessionManager.getSession();
+        try {
+            IDfFolder folder = (IDfFolder) session.getObject(new com.documentum.fc.common.DfId(folderId));
+            if (folder == null) {
+                throw new Exception("Folder not found: " + folderId);
+            }
+
+            // Check if attribute is actually repeating
+            if (!folder.isAttrRepeating(attributeName)) {
+                logger.warn("Attribute {} is not defined as repeating on folder, setting first value only",
+                           attributeName);
+                if (!values.isEmpty()) {
+                    folder.setString(attributeName, values.get(0));
+                }
+                folder.save();
+                return;
+            }
+
+            // Clear existing values first
+            int count = folder.getValueCount(attributeName);
+            for (int i = count - 1; i >= 0; i--) {
+                folder.remove(attributeName, i);
+            }
+
+            // Append new values using DFC's appendString()
+            for (String value : values) {
+                if (value != null && !value.trim().isEmpty()) {
+                    folder.appendString(attributeName, value.trim());
+                }
+            }
+
+            folder.save();
+            logger.debug("Set {} repeating values for attribute {} on folder: {}",
+                        values.size(), attributeName, folderId);
+        } finally {
+            sessionManager.releaseSession(session);
+        }
+    }
+
+    /**
      * Clear cache (for testing)
      */
     public void clearCache() {
