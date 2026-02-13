@@ -11,9 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -25,11 +23,16 @@ public class FolderService {
     private RealFolderRepository folderRepository;
     private MigrationConfig config;
     private Map<String, String> folderIdMap; // Path -> ID mapping
+    private UserLookupService userLookupService;
+    private AclService aclService;
 
-    public FolderService(RealFolderRepository folderRepository, MigrationConfig config) {
+    public FolderService(RealFolderRepository folderRepository, MigrationConfig config,
+                        UserLookupService userLookupService, AclService aclService) {
         this.folderRepository = folderRepository;
         this.config = config;
         this.folderIdMap = new HashMap<>();
+        this.userLookupService = userLookupService;
+        this.aclService = aclService;
     }
 
     /**
@@ -691,6 +694,120 @@ public class FolderService {
                              "ddm_vertical_users", "ddm_users");
         setRepeatingAttribute(folderId, migratedId, "repeating_workflow_users.csv",
                              "workflow_users", "workflow_groups");
+
+        // Apply ACL permissions for workflow users
+        applyWorkflowUserAcls(folderId, migratedId);
+    }
+
+    /**
+     * Apply ACL permissions for workflow users
+     * Called after setting workflow_groups repeating attribute
+     */
+    private void applyWorkflowUserAcls(String folderId, String migratedId) {
+        logger.debug("Applying workflow user ACLs for folder: {} (migrated_id: {})",
+                     folderId, migratedId);
+
+        try {
+            // Read workflow users from CSV
+            List<String> workflowUserNames = readWorkflowUsersFromCsv(migratedId);
+
+            if (workflowUserNames.isEmpty()) {
+                logger.debug("No workflow users found for migrated_id: {}", migratedId);
+                return;
+            }
+
+            logger.info("Found {} workflow users for folder {}",
+                       workflowUserNames.size(), folderId);
+
+            // Batch resolve user display names to login names
+            Map<String, String> resolvedUsers = userLookupService.batchResolveUsers(workflowUserNames);
+
+            List<String> userLogins = new java.util.ArrayList<>(resolvedUsers.values());
+
+            if (userLogins.isEmpty()) {
+                logger.warn("No workflow users could be resolved for folder {}", folderId);
+                return;
+            }
+
+            logger.info("Resolved {} out of {} workflow users for folder {}",
+                       userLogins.size(), workflowUserNames.size(), folderId);
+
+            // Create custom ACL with workflow users
+            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, userLogins);
+
+            if (aclId != null) {
+                // Apply ACL to folder
+                aclService.applyAclToFolder(folderId, aclId);
+                logger.info("Successfully applied workflow ACL to folder: {}", folderId);
+            }
+
+        } catch (Exception e) {
+            logger.error("Failed to apply workflow ACLs for folder {}: {}",
+                        folderId, e.getMessage(), e);
+            // Don't rethrow - let folder creation succeed even if ACL fails
+        }
+    }
+
+    /**
+     * Read workflow users from repeating_workflow_users.csv for a specific migrated_id
+     */
+    private List<String> readWorkflowUsersFromCsv(String migratedId) {
+        List<String> users = new java.util.ArrayList<>();
+        String csvPath = config.getDataExportPath() + "/repeating_workflow_users.csv";
+        File csvFile = new File(csvPath);
+
+        if (!csvFile.exists()) {
+            logger.warn("repeating_workflow_users.csv not found at: {}", csvPath);
+            return users;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+
+            // Read header
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return users;
+            }
+
+            int idIndex = findColumnIndex(headers, "r_object_id");
+            int userIndex = findColumnIndex(headers, "workflow_users");
+
+            if (idIndex < 0 || userIndex < 0) {
+                logger.warn("Required columns not found in repeating_workflow_users.csv");
+                csvReader.close();
+                return users;
+            }
+
+            // Read rows and collect users for this migrated_id
+            String[] row;
+            Set<String> uniqueUsers = new java.util.HashSet<>(); // Avoid duplicates
+
+            while ((row = csvReader.readNext()) != null) {
+                if (row.length > Math.max(idIndex, userIndex)) {
+                    String rowId = row[idIndex].trim();
+                    if (migratedId.equals(rowId)) {
+                        String userName = row[userIndex].trim();
+                        if (!userName.isEmpty()) {
+                            uniqueUsers.add(userName);
+                        }
+                    }
+                }
+            }
+
+            users.addAll(uniqueUsers);
+            csvReader.close();
+
+            logger.debug("Read {} unique workflow users for migrated_id: {}",
+                        users.size(), migratedId);
+
+        } catch (Exception e) {
+            logger.warn("Error reading workflow users from CSV: {}", e.getMessage());
+        }
+
+        return users;
     }
 
     /**

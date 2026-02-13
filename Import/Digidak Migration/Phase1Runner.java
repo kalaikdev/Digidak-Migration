@@ -2,9 +2,13 @@ import com.digidak.migration.config.DfcConfig;
 import com.digidak.migration.config.MigrationConfig;
 import com.digidak.migration.repository.RealSessionManager;
 import com.digidak.migration.repository.RealFolderRepository;
+import com.digidak.migration.repository.RealDocumentRepository;
 import com.digidak.migration.service.FolderService;
+import com.digidak.migration.service.UserLookupService;
+import com.digidak.migration.service.AclService;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runs ONLY Phase 1: Folder Structure Setup
@@ -36,16 +40,20 @@ public class Phase1Runner {
             System.out.println("[OK] Session manager initialized");
             System.out.println();
 
-            // Initialize folder repository
-            System.out.println("[INIT] Initializing folder repository...");
+            // Initialize repositories
+            System.out.println("[INIT] Initializing repositories...");
             RealFolderRepository folderRepository = new RealFolderRepository(sessionManager);
-            System.out.println("[OK] Folder repository initialized");
+            RealDocumentRepository documentRepository = new RealDocumentRepository(sessionManager);
+            System.out.println("[OK] Repositories initialized");
             System.out.println();
 
-            // Initialize folder service
-            System.out.println("[INIT] Initializing folder service...");
-            FolderService folderService = new FolderService(folderRepository, migrationConfig);
-            System.out.println("[OK] Folder service initialized");
+            // Initialize services
+            System.out.println("[INIT] Initializing services...");
+            UserLookupService userLookupService = new UserLookupService(sessionManager);
+            AclService aclService = new AclService(folderRepository, documentRepository, sessionManager);
+            FolderService folderService = new FolderService(folderRepository, migrationConfig,
+                                                           userLookupService, aclService);
+            System.out.println("[OK] Services initialized");
             System.out.println();
 
             // ===========================================
@@ -78,6 +86,9 @@ public class Phase1Runner {
                 System.out.println("  [" + id + "] " + path));
             System.out.println();
 
+            // Print ACL statistics
+            printAclStatistics(userLookupService);
+
             // Cleanup
             System.out.println("[CLEANUP] Cleaning up resources...");
             sessionManager.shutdown();
@@ -101,5 +112,32 @@ public class Phase1Runner {
             e.printStackTrace();
             System.exit(1);
         }
+    }
+
+    /**
+     * Print ACL and user resolution statistics
+     */
+    private static void printAclStatistics(UserLookupService userLookupService) {
+        System.out.println();
+        System.out.println("===========================================");
+        System.out.println("    ACL APPLICATION STATISTICS");
+        System.out.println("===========================================");
+
+        Map<String, String> resolvedUsers = userLookupService.getUserLoginCache();
+        Set<String> notFoundUsers = userLookupService.getNotFoundUsers();
+
+        System.out.println("[ACL] Users successfully resolved: " + resolvedUsers.size());
+        System.out.println("[ACL] Users not found in Documentum: " + notFoundUsers.size());
+
+        if (!notFoundUsers.isEmpty()) {
+            System.out.println();
+            System.out.println("[WARNING] Users not found (first 20):");
+            notFoundUsers.stream().limit(20).forEach(user ->
+                System.out.println("  - " + user)
+            );
+        }
+
+        System.out.println("===========================================");
+        System.out.println();
     }
 }
