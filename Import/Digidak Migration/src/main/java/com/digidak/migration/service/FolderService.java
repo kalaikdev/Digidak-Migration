@@ -704,6 +704,7 @@ public class FolderService {
      * Called after setting workflow_groups repeating attribute
      */
     private void applyWorkflowUserAcls(String folderId, String migratedId) {
+        System.out.println("=== ACL DEBUG === Applying workflow user ACLs for folder: " + folderId + " (migrated_id: " + migratedId + ")");
         logger.info("=== ACL DEBUG === Applying workflow user ACLs for folder: {} (migrated_id: {})",
                      folderId, migratedId);
 
@@ -711,43 +712,57 @@ public class FolderService {
             // Read workflow users from CSV
             List<String> workflowUserNames = readWorkflowUsersFromCsv(migratedId);
 
+            System.out.println("=== ACL DEBUG === Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
             logger.info("=== ACL DEBUG === Read {} workflow user names from CSV: {}",
                        workflowUserNames.size(), workflowUserNames);
 
             if (workflowUserNames.isEmpty()) {
+                System.out.println("=== ACL DEBUG === No workflow users found for migrated_id: " + migratedId);
                 logger.warn("=== ACL DEBUG === No workflow users found for migrated_id: {}", migratedId);
                 return;
             }
 
             // Batch resolve user display names to login names
+            System.out.println("=== ACL DEBUG === Calling userLookupService.batchResolveUsers()...");
             Map<String, String> resolvedUsers = userLookupService.batchResolveUsers(workflowUserNames);
+            System.out.println("=== ACL DEBUG === Resolved users map: " + resolvedUsers);
             logger.info("=== ACL DEBUG === Resolved users map: {}", resolvedUsers);
 
             List<String> userLogins = new java.util.ArrayList<>(resolvedUsers.values());
 
             if (userLogins.isEmpty()) {
+                System.out.println("=== ACL DEBUG === CRITICAL: No workflow users could be resolved for folder " + folderId);
+                System.out.println("=== ACL DEBUG === Original names: " + workflowUserNames);
                 logger.error("=== ACL DEBUG === CRITICAL: No workflow users could be resolved for folder {}. " +
                            "Original names: {}", folderId, workflowUserNames);
                 return;
             }
 
+            System.out.println("=== ACL DEBUG === Resolved " + userLogins.size() + " out of " + workflowUserNames.size() + " workflow users");
+            System.out.println("=== ACL DEBUG === User logins: " + userLogins);
             logger.info("=== ACL DEBUG === Resolved {} out of {} workflow users. User logins: {}",
                        userLogins.size(), workflowUserNames.size(), userLogins);
 
             // Create custom ACL with workflow users
+            System.out.println("=== ACL DEBUG === Creating ACL for folder " + folderId + " with users: " + userLogins);
             logger.info("=== ACL DEBUG === Creating ACL for folder {} with users: {}", folderId, userLogins);
             String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, userLogins);
 
             if (aclId != null) {
+                System.out.println("=== ACL DEBUG === ACL created with ID: " + aclId + ", now applying to folder");
                 logger.info("=== ACL DEBUG === ACL created with ID: {}, now applying to folder", aclId);
                 // Apply ACL to folder
                 aclService.applyAclToFolder(folderId, aclId);
+                System.out.println("=== ACL DEBUG === SUCCESS: Applied workflow ACL " + aclId + " to folder: " + folderId);
                 logger.info("=== ACL DEBUG === SUCCESS: Applied workflow ACL {} to folder: {}", aclId, folderId);
             } else {
+                System.out.println("=== ACL DEBUG === FAILED: ACL creation returned null for folder: " + folderId);
                 logger.error("=== ACL DEBUG === FAILED: ACL creation returned null for folder: {}", folderId);
             }
 
         } catch (Exception e) {
+            System.out.println("=== ACL DEBUG === EXCEPTION: Failed to apply workflow ACLs for folder " + folderId + ": " + e.getMessage());
+            e.printStackTrace();
             logger.error("=== ACL DEBUG === EXCEPTION: Failed to apply workflow ACLs for folder {}: {}",
                         folderId, e.getMessage(), e);
             e.printStackTrace();

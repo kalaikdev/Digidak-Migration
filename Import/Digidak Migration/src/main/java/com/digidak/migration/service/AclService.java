@@ -51,10 +51,12 @@ public class AclService {
      */
     public String createWorkflowUserAcl(String folderId, String migratedId,
                                        List<String> userLogins) throws Exception {
+        System.out.println("=== ACL SERVICE === createWorkflowUserAcl called with folderId: " + folderId + ", migratedId: " + migratedId + ", users: " + userLogins);
         logger.info("=== ACL SERVICE === createWorkflowUserAcl called with folderId: {}, migratedId: {}, users: {}",
                    folderId, migratedId, userLogins);
 
         if (userLogins == null || userLogins.isEmpty()) {
+            System.out.println("=== ACL SERVICE === No users provided for ACL creation for folder: " + folderId);
             logger.warn("=== ACL SERVICE === No users provided for ACL creation for folder: {}", folderId);
             return null;
         }
@@ -66,16 +68,19 @@ public class AclService {
             if (folder == null) {
                 throw new Exception("Folder not found: " + folderId);
             }
+            System.out.println("=== ACL SERVICE === Retrieved folder object: " + folder.getObjectName());
             logger.info("=== ACL SERVICE === Retrieved folder object: {}", folder.getObjectName());
 
             // Get existing ACL as template
             IDfACL existingAcl = folder.getACL();
             String aclDomain = existingAcl.getDomain();
+            System.out.println("=== ACL SERVICE === Existing ACL: " + existingAcl.getObjectName() + ", domain: " + aclDomain);
             logger.info("=== ACL SERVICE === Existing ACL: {}, domain: {}",
                        existingAcl.getObjectName(), aclDomain);
 
             // Create new ACL
             String aclName = ACL_NAME_PREFIX + migratedId;
+            System.out.println("=== ACL SERVICE === Creating new ACL with name: " + aclName);
             logger.info("=== ACL SERVICE === Creating new ACL with name: {}", aclName);
 
             IDfACL newAcl = (IDfACL) session.newObject("dm_acl");

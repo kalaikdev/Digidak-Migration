@@ -85,12 +85,14 @@ public class UserLookupService {
      * Batch resolve multiple users (optimization)
      */
     public Map<String, String> batchResolveUsers(List<String> displayNames) {
+        System.out.println("=== USER LOOKUP === batchResolveUsers called with " + (displayNames != null ? displayNames.size() : 0) + " display names: " + displayNames);
         logger.info("=== USER LOOKUP === batchResolveUsers called with {} display names: {}",
                    displayNames != null ? displayNames.size() : 0, displayNames);
 
         Map<String, String> results = new HashMap<>();
 
         if (displayNames == null || displayNames.isEmpty()) {
+            System.out.println("=== USER LOOKUP === No display names provided");
             logger.warn("=== USER LOOKUP === No display names provided");
             return results;
         }
@@ -149,6 +151,8 @@ public class UserLookupService {
             }
 
         } catch (Exception e) {
+            System.out.println("=== USER LOOKUP === EXCEPTION in batch user resolution: " + e.getMessage());
+            e.printStackTrace();
             logger.error("=== USER LOOKUP === EXCEPTION in batch user resolution: {}", e.getMessage(), e);
         } finally {
             if (session != null) {
@@ -156,6 +160,7 @@ public class UserLookupService {
             }
         }
 
+        System.out.println("=== USER LOOKUP === batchResolveUsers returning " + results.size() + " total results: " + results);
         logger.info("=== USER LOOKUP === batchResolveUsers returning {} total results: {}", results.size(), results);
         return results;
     }
