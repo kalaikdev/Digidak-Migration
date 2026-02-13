@@ -728,7 +728,7 @@ public class FolderService {
             System.out.println("=== ACL DEBUG === Resolved users map: " + resolvedUsers);
             logger.info("=== ACL DEBUG === Resolved users map: {}", resolvedUsers);
 
-            List<String> userLogins = new java.util.ArrayList<>(resolvedUsers.values());
+            List<String> userLogins = new java.util.ArrayList<>(resolvedUsers.keySet());
 
             if (userLogins.isEmpty()) {
                 System.out.println("=== ACL DEBUG === CRITICAL: No workflow users could be resolved for folder " + folderId);

@@ -260,7 +260,7 @@ public class AclService {
      * Check if user exists in Documentum
      */
     private boolean userExists(IDfSession session, String userLogin) throws Exception {
-        String dql = "SELECT user_login_name FROM dm_user WHERE user_login_name = '"
+        String dql = "SELECT user_name FROM dm_user WHERE user_name = '"
                      + userLogin.replace("'", "''") + "'";
 
         IDfQuery query = new DfQuery();
