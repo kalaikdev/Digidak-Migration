@@ -4,8 +4,10 @@ import com.digidak.migration.model.ImportResult;
 import com.digidak.migration.repository.RealDocumentRepository;
 import com.digidak.migration.repository.RealFolderRepository;
 import com.digidak.migration.repository.RealSessionManager;
+import com.digidak.migration.service.AclService;
 import com.digidak.migration.service.FolderService;
 import com.digidak.migration.service.MovementRegisterService;
+import com.digidak.migration.service.UserLookupService;
 
 import java.util.Map;
 
@@ -48,7 +50,10 @@ public class Phase3Runner {
 
             // Initialize services
             System.out.println("[INIT] Initializing services...");
-            FolderService folderService = new FolderService(folderRepository, migrationConfig);
+            UserLookupService userLookupService = new UserLookupService(sessionManager);
+            AclService aclService = new AclService(folderRepository, documentRepository, sessionManager);
+            FolderService folderService = new FolderService(folderRepository, migrationConfig,
+                                                           userLookupService, aclService);
             System.out.println("[OK] Services initialized");
             System.out.println();
 

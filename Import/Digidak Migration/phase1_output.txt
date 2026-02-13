@@ -1,0 +1,57 @@
+WARNING: package sun.reflect not in java.base
+===========================================
+DigiDak Migration - PHASE 1 ONLY
+Folder Structure Setup
+===========================================
+
+[CONFIG] Loading configurations...
+[CONFIG] Repository: NABARDUAT
+[CONFIG] Cabinet Name: Digidak Legacy
+[CONFIG] Data Export Path: DigidakMetadata_Export
+
+[INIT] Initializing session manager...
+2026-02-13 13:03:37,254 main DEBUG Apache Log4j Core 2.13.3 initializing configuration org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration@609e8838
+2026-02-13 13:03:37,257 main DEBUG Installed 0 script engines
+2026-02-13 13:03:37,257 main DEBUG PluginManager 'Core' found 123 plugins
+2026-02-13 13:03:37,257 main DEBUG PluginManager 'Level' found 0 plugins
+2026-02-13 13:03:37,259 main DEBUG PluginManager 'Lookup' found 16 plugins
+2026-02-13 13:03:37,266 main DEBUG Building Plugin[name=AppenderRef, class=org.apache.logging.log4j.core.config.AppenderRef].
+2026-02-13 13:03:37,275 main DEBUG PluginManager 'TypeConverter' found 26 plugins
+2026-02-13 13:03:37,279 main DEBUG createAppenderRef(ref="Console", level="null", Filter=null)
+2026-02-13 13:03:37,280 main DEBUG Building Plugin[name=AppenderRef, class=org.apache.logging.log4j.core.config.AppenderRef].
+2026-02-13 13:03:37,281 main DEBUG createAppenderRef(ref="LogToFile", level="null", Filter=null)
+2026-02-13 13:03:37,281 main DEBUG Building Plugin[name=root, class=org.apache.logging.log4j.core.config.LoggerConfig$RootLogger].
+2026-02-13 13:03:37,282 main DEBUG createLogger(additivity="null", level="WARN", includeLocation="null", ={Console, LogToFile}, ={}, Configuration(DefaultLogger), Filter=null)
+2026-02-13 13:03:37,284 main DEBUG Building Plugin[name=loggers, class=org.apache.logging.log4j.core.config.LoggersPlugin].
+2026-02-13 13:03:37,284 main DEBUG createLoggers(={root})
+2026-02-13 13:03:37,284 main DEBUG Building Plugin[name=appenders, class=org.apache.logging.log4j.core.config.AppendersPlugin].
+2026-02-13 13:03:37,285 main DEBUG createAppenders(={})
+2026-02-13 13:03:37,285 main ERROR Unable to locate appender "Console" for logger config "root"
+2026-02-13 13:03:37,286 main ERROR Unable to locate appender "LogToFile" for logger config "root"
+2026-02-13 13:03:37,286 main DEBUG Configuration org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration@609e8838 initialized
+2026-02-13 13:03:37,288 main DEBUG Starting configuration org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration@609e8838
+2026-02-13 13:03:37,288 main DEBUG Started configuration org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration@609e8838 OK.
+2026-02-13 13:03:37,288 main DEBUG Shutting down OutputStreamManager SYSTEM_OUT.false.false-2
+2026-02-13 13:03:37,288 main DEBUG OutputStream closed
+2026-02-13 13:03:37,288 main DEBUG Shut down OutputStreamManager SYSTEM_OUT.false.false-2, all resources released: true
+2026-02-13 13:03:37,288 main DEBUG Appender DefaultConsole-2 stopped with status true
+2026-02-13 13:03:37,288 main DEBUG Stopped org.apache.logging.log4j.core.config.DefaultConfiguration@5d47c63f OK
+2026-02-13 13:03:37,290 main DEBUG Registering MBean org.apache.logging.log4j2:type=73d16e93
+2026-02-13 13:03:37,290 main DEBUG Registering MBean org.apache.logging.log4j2:type=73d16e93,component=StatusLogger
+2026-02-13 13:03:37,290 main DEBUG Registering MBean org.apache.logging.log4j2:type=73d16e93,component=ContextSelector
+2026-02-13 13:03:37,290 main DEBUG Registering MBean org.apache.logging.log4j2:type=73d16e93,component=Loggers,name=
+2026-02-13 13:03:37,293 main DEBUG AsyncLogger.ThreadNameStrategy=UNCACHED (user specified null, default is UNCACHED)
+2026-02-13 13:03:37,293 main DEBUG org.apache.logging.log4j.core.util.SystemClock supports precise timestamps.
+[OK] Session manager initialized
+
+[INIT] Initializing repositories...
+[OK] Repositories initialized
+
+[INIT] Initializing services...
+[OK] Services initialized
+
+===========================================
+EXECUTING PHASE 1: Setting Up Folder Structure
+===========================================
+
+[PHASE 1] Creating folder structure...

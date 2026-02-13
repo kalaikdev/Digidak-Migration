@@ -7,6 +7,7 @@ import com.digidak.migration.repository.RealSessionManager;
 import com.digidak.migration.service.AclService;
 import com.digidak.migration.service.DocumentImportService;
 import com.digidak.migration.service.FolderService;
+import com.digidak.migration.service.UserLookupService;
 
 /**
  * Runs ONLY Phase 2: Document Import
@@ -49,8 +50,10 @@ public class Phase2Runner {
 
             // Initialize services
             System.out.println("[INIT] Initializing services...");
-            AclService aclService = new AclService(folderRepository, documentRepository);
-            FolderService folderService = new FolderService(folderRepository, migrationConfig);
+            UserLookupService userLookupService = new UserLookupService(sessionManager);
+            AclService aclService = new AclService(folderRepository, documentRepository, sessionManager);
+            FolderService folderService = new FolderService(folderRepository, migrationConfig,
+                                                           userLookupService, aclService);
             System.out.println("[OK] Services initialized");
             System.out.println();
 

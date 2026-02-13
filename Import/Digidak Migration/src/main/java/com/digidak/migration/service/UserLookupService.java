@@ -85,9 +85,13 @@ public class UserLookupService {
      * Batch resolve multiple users (optimization)
      */
     public Map<String, String> batchResolveUsers(List<String> displayNames) {
+        logger.info("=== USER LOOKUP === batchResolveUsers called with {} display names: {}",
+                   displayNames != null ? displayNames.size() : 0, displayNames);
+
         Map<String, String> results = new HashMap<>();
 
         if (displayNames == null || displayNames.isEmpty()) {
+            logger.warn("=== USER LOOKUP === No display names provided");
             return results;
         }
 
@@ -101,14 +105,21 @@ public class UserLookupService {
             String trimmed = displayName.trim();
             if (userLoginCache.containsKey(trimmed)) {
                 results.put(trimmed, userLoginCache.get(trimmed));
+                logger.info("=== USER LOOKUP === Found in cache: '{}' -> '{}'", trimmed, userLoginCache.get(trimmed));
             } else if (!notFoundUsers.contains(trimmed)) {
                 toQuery.add(trimmed);
+                logger.info("=== USER LOOKUP === Need to query: '{}'", trimmed);
+            } else {
+                logger.info("=== USER LOOKUP === Previously marked as not found: '{}'", trimmed);
             }
         }
 
         if (toQuery.isEmpty()) {
+            logger.info("=== USER LOOKUP === No users need querying, returning {} cached results", results.size());
             return results;
         }
+
+        logger.info("=== USER LOOKUP === Need to query {} users from dm_user", toQuery.size());
 
         IDfSession session = null;
         try {
@@ -119,7 +130,10 @@ public class UserLookupService {
                 int end = Math.min(i + 50, toQuery.size());
                 List<String> batch = toQuery.subList(i, end);
 
+                logger.info("=== USER LOOKUP === Querying batch of {} users", batch.size());
                 Map<String, String> batchResults = queryUsersInBatch(session, batch);
+                logger.info("=== USER LOOKUP === Batch query returned {} results: {}", batchResults.size(), batchResults);
+
                 results.putAll(batchResults);
 
                 // Cache results
@@ -129,18 +143,20 @@ public class UserLookupService {
                 for (String name : batch) {
                     if (!batchResults.containsKey(name)) {
                         notFoundUsers.add(name);
+                        logger.warn("=== USER LOOKUP === User '{}' NOT FOUND in dm_user", name);
                     }
                 }
             }
 
         } catch (Exception e) {
-            logger.error("Error in batch user resolution: {}", e.getMessage());
+            logger.error("=== USER LOOKUP === EXCEPTION in batch user resolution: {}", e.getMessage(), e);
         } finally {
             if (session != null) {
                 sessionManager.releaseSession(session);
             }
         }
 
+        logger.info("=== USER LOOKUP === batchResolveUsers returning {} total results: {}", results.size(), results);
         return results;
     }
 
