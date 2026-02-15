@@ -78,18 +78,27 @@ public class AclService {
             logger.info("=== ACL SERVICE === Existing ACL: {}, domain: {}",
                        existingAcl.getObjectName(), aclDomain);
 
-            // Create new ACL
+            // Check if ACL with this name already exists (from a previous run)
             String aclName = ACL_NAME_PREFIX + migratedId;
-            System.out.println("=== ACL SERVICE === Creating new ACL with name: " + aclName);
-            logger.info("=== ACL SERVICE === Creating new ACL with name: {}", aclName);
+            IDfACL newAcl = findExistingAcl(session, aclName, aclDomain);
 
-            IDfACL newAcl = (IDfACL) session.newObject("dm_acl");
-            newAcl.setObjectName(aclName);
-            newAcl.setDomain(aclDomain);
-            newAcl.setDescription("Workflow users ACL for migrated folder " + migratedId);
-            logger.info("=== ACL SERVICE === New ACL object created and configured");
+            if (newAcl != null) {
+                // Reuse existing ACL - clear old accessors and rebuild
+                logger.info("=== ACL SERVICE === Found existing ACL '{}', will update it", aclName);
+                int existingCount = newAcl.getAccessorCount();
+                for (int i = existingCount - 1; i >= 0; i--) {
+                    newAcl.revoke(newAcl.getAccessorName(i), "");
+                }
+            } else {
+                // Create new ACL
+                logger.info("=== ACL SERVICE === Creating new ACL with name: {}", aclName);
+                newAcl = (IDfACL) session.newObject("dm_acl");
+                newAcl.setObjectName(aclName);
+                newAcl.setDomain(aclDomain);
+                newAcl.setDescription("Workflow users ACL for migrated folder " + migratedId);
+            }
 
-            // Copy base permissions from existing ACL (dm_owner, dm_world, etc.)
+            // Copy base permissions from existing folder ACL (dm_owner, dm_world, etc.)
             logger.info("=== ACL SERVICE === Copying base permissions from existing ACL");
             copyBasePermissions(existingAcl, newAcl, session);
 
@@ -97,34 +106,17 @@ public class AclService {
             int addedUsers = 0;
             for (String userLogin : userLogins) {
                 try {
-                    logger.info("=== ACL SERVICE === Processing user: {}", userLogin);
-
-                    // Verify user exists
-                    if (!userExists(session, userLogin)) {
-                        logger.warn("=== ACL SERVICE === User '{}' does not exist in dm_user, skipping", userLogin);
-                        continue;
-                    }
-                    logger.info("=== ACL SERVICE === User '{}' exists in dm_user", userLogin);
-
-                    // Grant READ permission (permit type 1 = user access permit)
                     logger.info("=== ACL SERVICE === Granting READ permission to user: {}", userLogin);
                     newAcl.grant(userLogin, DF_PERMIT_READ, "");
-
                     addedUsers++;
                     logger.info("=== ACL SERVICE === Successfully granted READ permission to user: {}", userLogin);
-
                 } catch (Exception e) {
                     logger.error("=== ACL SERVICE === EXCEPTION: Failed to add user '{}' to ACL: {}",
                                userLogin, e.getMessage(), e);
                 }
             }
 
-            if (addedUsers == 0) {
-                logger.error("=== ACL SERVICE === CRITICAL: No users were successfully added to ACL for folder: {}", folderId);
-                return null;
-            }
-
-            logger.info("=== ACL SERVICE === Total users added to ACL: {}", addedUsers);
+            logger.info("=== ACL SERVICE === Added {} out of {} users to ACL", addedUsers, userLogins.size());
 
             // Save ACL
             logger.info("=== ACL SERVICE === Saving ACL object...");
@@ -254,6 +246,35 @@ public class AclService {
                             accessorName, permitLevel);
             }
         }
+    }
+
+    /**
+     * Find existing ACL by name and domain
+     */
+    private IDfACL findExistingAcl(IDfSession session, String aclName, String aclDomain) {
+        try {
+            String dql = "SELECT r_object_id FROM dm_acl WHERE object_name = '"
+                         + aclName.replace("'", "''") + "' AND domain = '"
+                         + aclDomain.replace("'", "''") + "'";
+
+            IDfQuery query = new DfQuery();
+            query.setDQL(dql);
+
+            IDfCollection collection = query.execute(session, IDfQuery.DF_READ_QUERY);
+            try {
+                if (collection.next()) {
+                    String aclId = collection.getString("r_object_id");
+                    IDfACL acl = (IDfACL) session.getObject(new DfId(aclId));
+                    logger.info("=== ACL SERVICE === Found existing ACL: {} (id: {})", aclName, aclId);
+                    return acl;
+                }
+            } finally {
+                collection.close();
+            }
+        } catch (Exception e) {
+            logger.warn("=== ACL SERVICE === Error looking up existing ACL '{}': {}", aclName, e.getMessage());
+        }
+        return null;
     }
 
     /**

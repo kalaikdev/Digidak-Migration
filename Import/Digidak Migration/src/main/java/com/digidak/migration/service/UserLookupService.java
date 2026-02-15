@@ -138,12 +138,52 @@ public class UserLookupService {
 
                 results.putAll(batchResults);
 
-                // Cache results
+                // Cache results - cache both dm_user.user_name and original CSV name
                 userLoginCache.putAll(batchResults);
 
-                // Mark not found
+                // Match batch names to query results (case-insensitive) with normalized fallback
                 for (String name : batch) {
-                    if (!batchResults.containsKey(name)) {
+                    String matchedLogin = batchResults.get(name);
+                    if (matchedLogin == null) {
+                        // Try case-insensitive match against dm_user.user_name keys
+                        for (Map.Entry<String, String> entry : batchResults.entrySet()) {
+                            if (entry.getKey().equalsIgnoreCase(name)) {
+                                matchedLogin = entry.getValue();
+                                userLoginCache.put(name, matchedLogin);
+                                logger.info("=== USER LOOKUP === Matched '{}' to dm_user '{}' (case-insensitive)",
+                                           name, entry.getKey());
+                                break;
+                            }
+                        }
+                    }
+                    if (matchedLogin == null) {
+                        // Fallback: try individual resolution with normalized name variations
+                        logger.info("=== USER LOOKUP === Trying normalized lookup for '{}'", name);
+                        String resolvedLogin = queryUserByDisplayName(session, name);
+                        if (resolvedLogin != null) {
+                            // queryUserByDisplayName matched by user_name, so CSV name IS the user_name
+                            matchedLogin = resolvedLogin;
+                            results.put(name, resolvedLogin);
+                            userLoginCache.put(name, resolvedLogin);
+                            logger.info("=== USER LOOKUP === Resolved '{}' via exact display name to '{}'",
+                                       name, resolvedLogin);
+                        } else {
+                            // Try normalized variations - need user_name for ACL grant()
+                            String[] resolved = tryNormalizedUserLookupFull(session, name);
+                            if (resolved != null) {
+                                String userName = resolved[0];  // dm_user.user_name
+                                String loginName = resolved[1]; // dm_user.user_login_name
+                                matchedLogin = loginName;
+                                // Use dm_user.user_name as key (required for ACL grant())
+                                results.put(userName, loginName);
+                                userLoginCache.put(name, loginName);
+                                userLoginCache.put(userName, loginName);
+                                logger.info("=== USER LOOKUP === Resolved '{}' via normalized lookup to user_name='{}', login='{}'",
+                                           name, userName, loginName);
+                            }
+                        }
+                    }
+                    if (matchedLogin == null) {
                         notFoundUsers.add(name);
                         logger.warn("=== USER LOOKUP === User '{}' NOT FOUND in dm_user", name);
                     }
@@ -232,7 +272,7 @@ public class UserLookupService {
 
         for (String variation : variations) {
             try {
-                String dql = "SELECT user_login_name FROM dm_user WHERE LOWER(user_login_name) = '"
+                String dql = "SELECT user_name, user_login_name FROM dm_user WHERE LOWER(user_login_name) = '"
                             + variation.toLowerCase() + "'";
 
                 IDfQuery query = new DfQuery();
@@ -241,8 +281,10 @@ public class UserLookupService {
                 IDfCollection collection = query.execute(session, IDfQuery.DF_READ_QUERY);
                 try {
                     if (collection.next()) {
+                        String userName = collection.getString("user_name");
                         String loginName = collection.getString("user_login_name");
-                        logger.debug("Resolved '{}' to '{}' via normalized lookup", displayName, loginName);
+                        logger.debug("Resolved '{}' to user_name='{}', login='{}' via normalized lookup",
+                                    displayName, userName, loginName);
                         return loginName;
                     }
                 } finally {
@@ -250,6 +292,41 @@ public class UserLookupService {
                 }
             } catch (Exception e) {
                 // Continue to next variation
+                logger.trace("Failed normalized lookup for variation '{}': {}", variation, e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Try normalized user lookup returning both user_name and user_login_name.
+     * Returns String[]{user_name, user_login_name} or null if not found.
+     */
+    private String[] tryNormalizedUserLookupFull(IDfSession session, String displayName) {
+        List<String> variations = generateLoginVariations(displayName);
+
+        for (String variation : variations) {
+            try {
+                String dql = "SELECT user_name, user_login_name FROM dm_user WHERE LOWER(user_login_name) = '"
+                            + variation.toLowerCase() + "'";
+
+                IDfQuery query = new DfQuery();
+                query.setDQL(dql);
+
+                IDfCollection collection = query.execute(session, IDfQuery.DF_READ_QUERY);
+                try {
+                    if (collection.next()) {
+                        String userName = collection.getString("user_name");
+                        String loginName = collection.getString("user_login_name");
+                        logger.debug("Resolved '{}' to user_name='{}', login='{}' via normalized lookup",
+                                    displayName, userName, loginName);
+                        return new String[]{userName, loginName};
+                    }
+                } finally {
+                    collection.close();
+                }
+            } catch (Exception e) {
                 logger.trace("Failed normalized lookup for variation '{}': {}", variation, e.getMessage());
             }
         }

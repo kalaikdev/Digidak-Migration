@@ -722,31 +722,10 @@ public class FolderService {
                 return;
             }
 
-            // Batch resolve user display names to login names
-            System.out.println("=== ACL DEBUG === Calling userLookupService.batchResolveUsers()...");
-            Map<String, String> resolvedUsers = userLookupService.batchResolveUsers(workflowUserNames);
-            System.out.println("=== ACL DEBUG === Resolved users map: " + resolvedUsers);
-            logger.info("=== ACL DEBUG === Resolved users map: {}", resolvedUsers);
-
-            List<String> userLogins = new java.util.ArrayList<>(resolvedUsers.keySet());
-
-            if (userLogins.isEmpty()) {
-                System.out.println("=== ACL DEBUG === CRITICAL: No workflow users could be resolved for folder " + folderId);
-                System.out.println("=== ACL DEBUG === Original names: " + workflowUserNames);
-                logger.error("=== ACL DEBUG === CRITICAL: No workflow users could be resolved for folder {}. " +
-                           "Original names: {}", folderId, workflowUserNames);
-                return;
-            }
-
-            System.out.println("=== ACL DEBUG === Resolved " + userLogins.size() + " out of " + workflowUserNames.size() + " workflow users");
-            System.out.println("=== ACL DEBUG === User logins: " + userLogins);
-            logger.info("=== ACL DEBUG === Resolved {} out of {} workflow users. User logins: {}",
-                       userLogins.size(), workflowUserNames.size(), userLogins);
-
-            // Create custom ACL with workflow users
-            System.out.println("=== ACL DEBUG === Creating ACL for folder " + folderId + " with users: " + userLogins);
-            logger.info("=== ACL DEBUG === Creating ACL for folder {} with users: {}", folderId, userLogins);
-            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, userLogins);
+            // Pass workflow user names directly to ACL service (no resolution needed)
+            System.out.println("=== ACL DEBUG === Creating ACL for folder " + folderId + " with workflow users: " + workflowUserNames);
+            logger.info("=== ACL DEBUG === Creating ACL for folder {} with workflow users: {}", folderId, workflowUserNames);
+            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames);
 
             if (aclId != null) {
                 System.out.println("=== ACL DEBUG === ACL created with ID: " + aclId + ", now applying to folder");
