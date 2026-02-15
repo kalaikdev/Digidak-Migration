@@ -151,14 +151,15 @@ public class DocumentImportService {
         // Set metadata
         documentRepository.setMetadata(documentId, metadata);
 
-        // Attach content file
-        String contentFileName = metadata.getObjectName();
-        File contentFile = new File(folder, contentFileName);
+        // Attach content file - search folder for matching content
+        File contentFile = findContentFile(folder, metadata.getObjectName());
 
-        if (contentFile.exists()) {
+        if (contentFile != null && contentFile.exists()) {
             documentRepository.setContent(documentId, contentFile);
+            logger.info("Content attached from file: {}", contentFile.getName());
         } else {
-            logger.warn("Content file not found: {}", contentFile.getAbsolutePath());
+            logger.warn("Content file not found for object_name '{}' in folder: {}",
+                    metadata.getObjectName(), folder.getAbsolutePath());
         }
 
         // Apply ACL from parent folder
@@ -173,6 +174,31 @@ public class DocumentImportService {
         documentRepository.save(documentId);
 
         logger.debug("Document imported successfully: {}", metadata.getObjectName());
+    }
+
+    /**
+     * Find content file in folder matching the object_name.
+     * Strips extension from object_name and scans folder for matching non-CSV files.
+     */
+    private File findContentFile(File folder, String objectName) {
+        if (objectName == null || objectName.trim().isEmpty()) {
+            return null;
+        }
+
+        // Strip file extension from object_name to get base name
+        String baseName = objectName.contains(".")
+                ? objectName.substring(0, objectName.lastIndexOf('.'))
+                : objectName;
+
+        // Find non-CSV files in folder that start with the base name
+        File[] candidates = folder.listFiles((dir, name) ->
+                !name.toLowerCase().endsWith(".csv") && name.startsWith(baseName));
+        if (candidates != null && candidates.length > 0) {
+            logger.debug("Content file matched for '{}': {}", baseName, candidates[0].getName());
+            return candidates[0];
+        }
+
+        return null;
     }
 
     /**
