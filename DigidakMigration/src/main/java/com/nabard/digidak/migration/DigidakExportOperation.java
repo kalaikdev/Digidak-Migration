@@ -46,43 +46,43 @@ public class DigidakExportOperation {
      * WHERE clause: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true AND bulk_letter !='true'
      */
     public void extractSingleRecordsCSV(IDfSession session, String outputFilePath, String repoName,
-            int threadCount, int timeoutHours) {
-        
-        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=false AND bulk_letter !='true'";
+            int threadCount, int timeoutHours, String baseDateFilter) {
+
+        String whereClause = baseDateFilter + " AND group_letter_id=false AND bulk_letter !='true'";
         String recordsDir = "digidak_single_records";
         String csvFileName = "DigidakSingleRecords_Export.csv";
-        
+
         logger.info("========== Exporting SINGLE Records ==========");
         extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true, true);
     }
 
     /**
      * Extracts Group Digidak records to CSV file.
-     * WHERE clause: Q1 2024 AND group_letter_id=true
+     * WHERE clause: baseDateFilter AND group_letter_id=true
      */
     public void extractGroupRecordsCSV(IDfSession session, String outputFilePath, String repoName,
-            int threadCount, int timeoutHours) {
-        
-        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=true";
+            int threadCount, int timeoutHours, String baseDateFilter) {
+
+        String whereClause = baseDateFilter + " AND group_letter_id=true";
         String recordsDir = "digidak_group_records";
         String csvFileName = "DigidakGroupRecords_Export.csv";
-        
+
         logger.info("========== Exporting GROUP Records ==========");
         extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, true, false);
     }
 
     /**
      * Extracts Subletter Digidak records (bulk letters) to CSV file.
-     * WHERE clause: Q1 2024 AND group_letter_id=false AND bulk_letter='true'
+     * WHERE clause: baseDateFilter AND group_letter_id=false AND bulk_letter='true'
      * Note: Subletter records only export movement_register.csv (no document metadata)
      */
     public void extractSubletterRecordsCSV(IDfSession session, String outputFilePath, String repoName,
-            int threadCount, int timeoutHours) {
-        
-        String whereClause = "(r_creation_date >= DATE('05/01/2024','mm/dd/yyyy') AND r_creation_date <= DATE('05/02/2024','mm/dd/yyyy')) AND group_letter_id=false AND bulk_letter='true'";
+            int threadCount, int timeoutHours, String baseDateFilter) {
+
+        String whereClause = baseDateFilter + " AND group_letter_id=false AND bulk_letter='true'";
         String recordsDir = "digidak_subletter_records";
         String csvFileName = "DigidakSubletterRecords_Export.csv";
-        
+
         logger.info("========== Exporting SUBLETTER Records (Movement Register Only) ==========");
         extractRecordsInternal(session, outputFilePath, whereClause, repoName, threadCount, timeoutHours, recordsDir, csvFileName, false, true);
     }
@@ -107,10 +107,11 @@ public class DigidakExportOperation {
         // Source type: edmapp_letter_folder
         String baseDql = "SELECT distinct r_object_id, object_name, subject, r_creator_name, r_creation_date, " +
                 "status, priority, uid_number, mode_of_receipt, state_of_recipient, sent_to, " +
-                "office_region, group_letter_id, crds_flag, responded_object_id, language_type, address_of_recipient, " +
+                "office_region, group_letter_id, responded_object_id, language_type, address_of_recipient, " +
                 "sensitivity, region, ref_number, letter_no, financial_year, received_from, " +
                 "sub_type, category_external, subjects, category_type, bulk_letter, file_no, type_mode, ho_ro_te, " +
-                "from_dept_ro_te FROM edmapp_letter_folder";
+                "from_dept_ro_te, letter_case_number, date_of_receipt, foward_group_id, inward_ref_number, " +
+                "assigned_cgm_group, due_date_action, endorse_group_id, is_ddm, vertical_head_group FROM edmapp_letter_folder";
 
         String dql = baseDql;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
@@ -138,15 +139,19 @@ public class DigidakExportOperation {
             String[] headers = {
                     "r_object_id", "object_name", "subject", "r_creator_name", "r_creation_date",
                     "status", "priority", "uid_number", "mode_of_receipt", "state_of_recipient",
-                    "sent_to", "office_region", "group_letter_id", "crds_flag", "responded_object_id",
+                    "sent_to", "office_region", "group_letter_id", "responded_object_id",
                     "language_type", "address_of_recipient", "sensitivity", "region", "ref_number",
                     "letter_no", "financial_year", "received_from", "sub_type",
                     "category_external", "subjects", "category_type", "bulk_letter", "file_no", "type_mode",
-                    "ho_ro_te", "from_dept_ro_te"
+                    "ho_ro_te", "from_dept_ro_te", "letter_case_number", "date_of_receipt", "foward_group_id",
+                    "inward_ref_number", "assigned_cgm_group", "due_date_action", "endorse_group_id", "vertical_head_group"
             };
 
             // Write Headers
             List<String> outputHeaders = new ArrayList<>(Arrays.asList(headers));
+            outputHeaders.add("is_endorsed");
+            outputHeaders.add("is_forward");
+            outputHeaders.add("is_ddm");
             outputHeaders.add("export_status");
             outputHeaders.add("error_message");
             writeLine(writer, outputHeaders.toArray(new String[0]));
@@ -167,6 +172,9 @@ public class DigidakExportOperation {
                 String tempObjectId = "";
                 String tempObjectName = "";
                 String tempUidNumber = "";
+                String tempEndorseGroupId = "";
+                String tempForwardGroupId = "";
+                String tempIsDdm = "";
 
                 // Extract all data from collection while the cursor is strictly on this row
                 for (String header : headers) {
@@ -182,8 +190,30 @@ public class DigidakExportOperation {
                         tempObjectName = val;
                     } else if (header.equals("uid_number")) {
                         tempUidNumber = val;
+                    } else if (header.equals("endorse_group_id")) {
+                        tempEndorseGroupId = val;
+                    } else if (header.equals("foward_group_id")) {
+                        tempForwardGroupId = val;
                     }
                 }
+
+                // Get is_ddm value separately (not in headers array but needed for computation)
+                if (collection.hasAttr("is_ddm")) {
+                    tempIsDdm = collection.getString("is_ddm");
+                }
+
+                // Compute boolean columns
+                // is_endorsed: false if endorse_group_id is empty
+                boolean isEndorsed = tempEndorseGroupId != null && !tempEndorseGroupId.trim().isEmpty();
+                row.add(String.valueOf(isEndorsed));
+
+                // is_forward: false if foward_group_id is empty
+                boolean isForward = tempForwardGroupId != null && !tempForwardGroupId.trim().isEmpty();
+                row.add(String.valueOf(isForward));
+
+                // is_ddm: true if is_ddm == 'DDM'
+                boolean isDdm = "DDM".equalsIgnoreCase(tempIsDdm != null ? tempIsDdm.trim() : "");
+                row.add(String.valueOf(isDdm));
 
                 // Final variables for the thread
                 final String digidakObjectId = tempObjectId;
@@ -290,10 +320,8 @@ public class DigidakExportOperation {
     public void extractRepeatingAttributesCSV(IDfSession session, String outputFilePath, String whereClause) {
         // Export each repeating attribute for edmapp_letter_folder to its own CSV file
         String[] folderAttributes = {
-            "office_type", "assigned_user", "response_to_ioms_id", "src_vertical_users",
-            "assigned_vertical", "assigned_vertical_group", "endorse_object_id",
-            "cgm_and_assigned_groups", "vertical_head_user", "vertical_head_group",
-            "vertical_users", "ddm_vertical_users", "document_comments", "efd_comments"
+            "office_type", "response_to_ioms_id", "endorse_object_id",
+            "cgm_and_assigned_groups", "vertical_users", "ddm_vertical_users"
         };
 
         for (String attr : folderAttributes) {
@@ -305,17 +333,21 @@ public class DigidakExportOperation {
         // The link is: edmapp_letter_movement_reg.letter_number = edmapp_letter_folder.uid_number
         String movementWhereClause = "letter_number IN (SELECT uid_number FROM edmapp_letter_folder WHERE " + whereClause + ")";
         exportRepeatingAttribute(session, outputFilePath, movementWhereClause, "edmapp_letter_movement_reg", "send_to");
+
+        // Export workflow users based on cgm_and_assigned_groups
+        exportWorkflowUsers(session, outputFilePath, whereClause);
     }
 
     /**
      * Exports a single repeating attribute to a CSV file.
+     * IMPROVED APPROACH: Fetch objects and iterate through repeating values programmatically
      */
     private void exportRepeatingAttribute(IDfSession session, String outputBasePath, String whereClause, String typeName, String attributeName) {
-        String dql = "SELECT r_object_id, " + attributeName + " FROM " + typeName;
+        // Query to get object IDs only (not the repeating attribute in the query)
+        String dql = "SELECT r_object_id FROM " + typeName;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
             dql += " WHERE " + whereClause;
         }
-        dql += " ENABLE (ROW_BASED)";
 
         logger.info("Exporting repeating attribute: " + attributeName);
         logger.debug("Executing Query: " + dql);
@@ -336,28 +368,172 @@ public class DigidakExportOperation {
             String[] headers = { "r_object_id", attributeName };
             writeLine(writer, headers);
 
-            int count = 0;
-            while (collection.next()) {
-                List<String> row = new ArrayList<>();
-                // r_object_id
-                row.add(collection.getString("r_object_id"));
-                
-                // attribute value
-                String val = "";
-                if (collection.hasAttr(attributeName)) {
-                    // Start: check if repeating
-                   // But since we selected it directly, just getString usually gets the current row value in ROW_BASED query
-                   val = collection.getString(attributeName);
-                }
-                row.add(val);
+            int totalRows = 0;
+            int objectCount = 0;
 
-                writeLine(writer, row.toArray(new String[0]));
-                count++;
+            while (collection.next()) {
+                String objectId = collection.getString("r_object_id");
+                objectCount++;
+
+                try {
+                    // Fetch the object to access repeating attribute values
+                    IDfSysObject sysObj = (IDfSysObject) session.getObject(new DfId(objectId));
+
+                    // Get the count of values for this repeating attribute
+                    int valueCount = sysObj.getValueCount(attributeName);
+
+                    // If no values, skip this object (don't write empty rows)
+                    if (valueCount == 0) {
+                        logger.debug("Object " + objectId + " has no values for " + attributeName);
+                        continue;
+                    }
+
+                    // Iterate through each value in the repeating attribute
+                    for (int i = 0; i < valueCount; i++) {
+                        String value = sysObj.getRepeatingString(attributeName, i);
+
+                        // Skip null or empty values
+                        if (value != null && !value.trim().isEmpty()) {
+                            List<String> row = new ArrayList<>();
+                            row.add(objectId);  // Correct r_object_id
+                            row.add(value);     // Individual repeating value
+                            writeLine(writer, row.toArray(new String[0]));
+                            totalRows++;
+                        }
+                    }
+
+                } catch (DfException e) {
+                    logger.error("Error fetching object " + objectId + " for attribute " + attributeName + ": " + e.getMessage());
+                    // Continue with next object instead of failing entirely
+                }
             }
-            logger.info("Exported " + count + " rows for attribute " + attributeName + " to " + outputFile.getName());
+
+            logger.info("Exported " + totalRows + " rows from " + objectCount + " objects for attribute " + attributeName + " to " + outputFile.getName());
 
         } catch (DfException | IOException e) {
             logger.error("Error in exportRepeatingAttribute for " + attributeName, e);
+        } finally {
+            if (collection != null) {
+                try {
+                    collection.close();
+                } catch (DfException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
+     * Exports workflow users based on cgm_and_assigned_groups attribute.
+     * Fetches all users from dm_group based on group_name values in cgm_and_assigned_groups.
+     * IMPROVED APPROACH: Fetch objects and iterate through repeating values programmatically
+     */
+    private void exportWorkflowUsers(IDfSession session, String outputBasePath, String whereClause) {
+        logger.info("Exporting workflow users based on cgm_and_assigned_groups...");
+
+        File mainExportDir = new File(outputBasePath);
+        if (!mainExportDir.exists()) {
+            mainExportDir.mkdirs();
+        }
+        File outputFile = new File(mainExportDir, "repeating_workflow_users.csv");
+
+        // Get all records (object IDs only)
+        String dql = "SELECT r_object_id FROM edmapp_letter_folder";
+        if (whereClause != null && !whereClause.trim().isEmpty()) {
+            dql += " WHERE " + whereClause;
+        }
+
+        logger.debug("Executing Query: " + dql);
+
+        IDfCollection collection = null;
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+            IDfQuery query = new DfQuery();
+            query.setDQL(dql);
+            collection = query.execute(session, IDfQuery.DF_READ_QUERY);
+
+            // Header: r_object_id, workflow_users
+            String[] headers = { "r_object_id", "workflow_users" };
+            writeLine(writer, headers);
+
+            int totalRows = 0;
+            int objectCount = 0;
+
+            while (collection.next()) {
+                String objectId = collection.getString("r_object_id");
+                objectCount++;
+
+                try {
+                    // Fetch the object to access cgm_and_assigned_groups repeating attribute
+                    IDfSysObject folderObj = (IDfSysObject) session.getObject(new DfId(objectId));
+
+                    // Get the count of groups assigned
+                    int groupCount = folderObj.getValueCount("cgm_and_assigned_groups");
+
+                    if (groupCount == 0) {
+                        logger.debug("Object " + objectId + " has no cgm_and_assigned_groups");
+                        continue;
+                    }
+
+                    // Iterate through each group name
+                    for (int i = 0; i < groupCount; i++) {
+                        String groupName = folderObj.getRepeatingString("cgm_and_assigned_groups", i);
+
+                        // Skip if no group name
+                        if (groupName == null || groupName.trim().isEmpty()) {
+                            continue;
+                        }
+
+                        // Query dm_group to get users_names for this group (object ID only)
+                        String groupDql = "SELECT r_object_id FROM dm_group WHERE group_name = '" + groupName.replace("'", "''") + "'";
+
+                        IDfCollection groupCollection = null;
+                        try {
+                            IDfQuery groupQuery = new DfQuery();
+                            groupQuery.setDQL(groupDql);
+                            groupCollection = groupQuery.execute(session, IDfQuery.DF_READ_QUERY);
+
+                            if (groupCollection.next()) {
+                                String groupObjectId = groupCollection.getString("r_object_id");
+
+                                // Fetch the group object to access users_names repeating attribute
+                                IDfSysObject groupObj = (IDfSysObject) session.getObject(new DfId(groupObjectId));
+                                int userCount = groupObj.getValueCount("users_names");
+
+                                // Iterate through each user in the group
+                                for (int j = 0; j < userCount; j++) {
+                                    String userName = groupObj.getRepeatingString("users_names", j);
+
+                                    if (userName != null && !userName.trim().isEmpty()) {
+                                        List<String> row = new ArrayList<>();
+                                        row.add(objectId);  // Correct folder r_object_id
+                                        row.add(userName);  // Individual user name
+                                        writeLine(writer, row.toArray(new String[0]));
+                                        totalRows++;
+                                    }
+                                }
+                            }
+                        } catch (DfException e) {
+                            logger.error("Error querying dm_group for group: " + groupName + ": " + e.getMessage());
+                        } finally {
+                            if (groupCollection != null) {
+                                try {
+                                    groupCollection.close();
+                                } catch (DfException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                    }
+
+                } catch (DfException e) {
+                    logger.error("Error processing object " + objectId + " for workflow users: " + e.getMessage());
+                }
+            }
+
+            logger.info("Exported " + totalRows + " workflow users from " + objectCount + " objects to " + outputFile.getName());
+
+        } catch (DfException | IOException e) {
+            logger.error("Error in exportWorkflowUsers", e);
         } finally {
             if (collection != null) {
                 try {
@@ -438,7 +614,7 @@ public class DigidakExportOperation {
         }
 
         // DQL for documents from source: edmapp_letter_document
-        String docDql = "select distinct r_object_id, object_name, r_object_type, i_folder_id, r_folder_path, r_content_size, a_content_type, r_creator_name, r_creation_date, document_type " +
+        String docDql = "select distinct r_object_id, object_name, r_object_type, i_folder_id, r_folder_path, r_content_size, a_content_type, r_creator_name, r_creation_date, document_type, title " +
                 "from edmapp_letter_document doc, dm_folder fol " +
                 "where folder(ID('" + digidakObjectId + "'), descend) AND ANY i_folder_id is not null " +
                 "AND doc.i_folder_id=fol.r_object_id AND r_folder_path is not null ENABLE (ROW_BASED)";
@@ -453,7 +629,7 @@ public class DigidakExportOperation {
 
             String[] headers = {
                     "r_object_id", "object_name", "r_object_type", "i_folder_id", "r_folder_path", "r_creator_name",
-                    "r_creation_date", "document_type"
+                    "r_creation_date", "document_type", "title"
             };
 
             writeLine(writer, headers);
@@ -642,21 +818,20 @@ public class DigidakExportOperation {
 
             // Run Export
             DigidakExportOperation exporter = new DigidakExportOperation();
-            
-            // Export Repeating Attributes
+
+            logger.info("Using WHERE clause for ALL exports: " + whereClause);
+
+            // Export Repeating Attributes (uses SAME whereClause)
             exporter.extractRepeatingAttributesCSV(session, exportPath, whereClause);
-            
-            // Export Single Records (non-bulk, non-group letters)
-            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true AND bulk_letter !='true'
-            exporter.extractSingleRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
-            
-            // Export Group Records
-            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=true
-            exporter.extractGroupRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
-            
-            // Export Subletter Records (bulk letters)
-            // WHERE: DATETOSTRING("r_creation_date", 'yyyy')='2024' AND group_letter_id=false AND bulk_letter='true'
-            exporter.extractSubletterRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours);
+
+            // Export Single Records (uses SAME whereClause + additional filters)
+            exporter.extractSingleRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours, whereClause);
+
+            // Export Group Records (uses SAME whereClause + additional filters)
+            exporter.extractGroupRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours, whereClause);
+
+            // Export Subletter Records (uses SAME whereClause + additional filters)
+            exporter.extractSubletterRecordsCSV(session, exportPath, repoName, threadCount, timeoutHours, whereClause);
 
             // Release Session
             DocumentumSessionManager.releaseSession(session);
