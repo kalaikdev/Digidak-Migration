@@ -702,6 +702,8 @@ public class FolderService {
     /**
      * Apply ACL permissions for workflow users
      * Called after setting workflow_groups repeating attribute
+     * For group folders (object_name starts with "G"), collects workflow users from all subletter children
+     * and creates ACL with prefix acl_digidakG_
      */
     private void applyWorkflowUserAcls(String folderId, String migratedId) {
         System.out.println("=== ACL DEBUG === Applying workflow user ACLs for folder: " + folderId + " (migrated_id: " + migratedId + ")");
@@ -709,31 +711,38 @@ public class FolderService {
                      folderId, migratedId);
 
         try {
-            // Read workflow users from CSV
-            List<String> workflowUserNames = readWorkflowUsersFromCsv(migratedId);
+            // Check if this is a group folder by looking up the object_name
+            boolean isGroupFolder = isGroupFolder(migratedId);
+            List<String> workflowUserNames;
 
-            System.out.println("=== ACL DEBUG === Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
-            logger.info("=== ACL DEBUG === Read {} workflow user names from CSV: {}",
-                       workflowUserNames.size(), workflowUserNames);
-
-            if (workflowUserNames.isEmpty()) {
-                System.out.println("=== ACL DEBUG === No workflow users found for migrated_id: " + migratedId);
-                logger.warn("=== ACL DEBUG === No workflow users found for migrated_id: {}", migratedId);
-                return;
+            if (isGroupFolder) {
+                // For group folders, collect workflow users from all subletter children
+                workflowUserNames = collectSubletterWorkflowUsers(migratedId);
+                System.out.println("=== ACL DEBUG === Group folder detected. Collected " + workflowUserNames.size() + " workflow users from subletters: " + workflowUserNames);
+                logger.info("=== ACL DEBUG === Group folder detected. Collected {} workflow users from subletters: {}",
+                           workflowUserNames.size(), workflowUserNames);
+            } else {
+                // For single/subletter folders, read workflow users directly
+                workflowUserNames = readWorkflowUsersFromCsv(migratedId);
+                System.out.println("=== ACL DEBUG === Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
+                logger.info("=== ACL DEBUG === Read {} workflow user names from CSV: {}",
+                           workflowUserNames.size(), workflowUserNames);
             }
 
-            // Pass workflow user names directly to ACL service (no resolution needed)
-            System.out.println("=== ACL DEBUG === Creating ACL for folder " + folderId + " with workflow users: " + workflowUserNames);
-            logger.info("=== ACL DEBUG === Creating ACL for folder {} with workflow users: {}", folderId, workflowUserNames);
-            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames);
+            if (workflowUserNames.isEmpty()) {
+                System.out.println("=== ACL DEBUG === No workflow users found for migrated_id: " + migratedId + ", will still create custom ACL");
+                logger.info("=== ACL DEBUG === No workflow users found for migrated_id: {}, will still create custom ACL", migratedId);
+            }
+
+            // Always create custom ACL (even with 0 workflow users) to replace default ACL
+            // createWorkflowUserAcl now also applies the ACL to folder in a single session
+            System.out.println("=== ACL DEBUG === Creating and applying ACL for folder " + folderId + " with " + workflowUserNames.size() + " workflow users: " + workflowUserNames);
+            logger.info("=== ACL DEBUG === Creating and applying ACL for folder {} with {} workflow users: {}", folderId, workflowUserNames.size(), workflowUserNames);
+            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames, isGroupFolder);
 
             if (aclId != null) {
-                System.out.println("=== ACL DEBUG === ACL created with ID: " + aclId + ", now applying to folder");
-                logger.info("=== ACL DEBUG === ACL created with ID: {}, now applying to folder", aclId);
-                // Apply ACL to folder
-                aclService.applyAclToFolder(folderId, aclId);
-                System.out.println("=== ACL DEBUG === SUCCESS: Applied workflow ACL " + aclId + " to folder: " + folderId);
-                logger.info("=== ACL DEBUG === SUCCESS: Applied workflow ACL {} to folder: {}", aclId, folderId);
+                System.out.println("=== ACL DEBUG === SUCCESS: ACL created and applied with ID: " + aclId + " for folder: " + folderId);
+                logger.info("=== ACL DEBUG === SUCCESS: ACL created and applied with ID: {} for folder: {}", aclId, folderId);
             } else {
                 System.out.println("=== ACL DEBUG === FAILED: ACL creation returned null for folder: " + folderId);
                 logger.error("=== ACL DEBUG === FAILED: ACL creation returned null for folder: {}", folderId);
@@ -747,6 +756,166 @@ public class FolderService {
             e.printStackTrace();
             // Don't rethrow - let folder creation succeed even if ACL fails
         }
+    }
+
+    /**
+     * Check if a folder is a group folder by looking up object_name in DigidakGroupRecords_Export.csv
+     */
+    private boolean isGroupFolder(String migratedId) {
+        File csvFile = new File(config.getDataExportPath() + "/DigidakGroupRecords_Export.csv");
+        if (!csvFile.exists()) {
+            return false;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return false;
+            }
+
+            int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
+            if (rObjectIdIndex < 0) {
+                csvReader.close();
+                return false;
+            }
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                if (row.length > rObjectIdIndex && migratedId.equals(row[rObjectIdIndex].trim())) {
+                    csvReader.close();
+                    return true;
+                }
+            }
+            csvReader.close();
+        } catch (Exception e) {
+            logger.warn("Error checking if folder is group folder: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * Collect workflow users from all subletter children of a group folder
+     * Reads subletter r_object_ids from DigidakSubletterRecords_Export.csv,
+     * then collects workflow users for each subletter from repeating_workflow_users.csv
+     */
+    private List<String> collectSubletterWorkflowUsers(String groupMigratedId) {
+        Set<String> allUsers = new java.util.LinkedHashSet<>();
+
+        // Step 1: Find the group folder's object_name from DigidakGroupRecords_Export.csv
+        String groupObjectName = getObjectNameByMigratedId(groupMigratedId, "DigidakGroupRecords_Export.csv");
+        if (groupObjectName == null) {
+            logger.warn("Could not find object_name for group migrated_id: {}", groupMigratedId);
+            return new java.util.ArrayList<>(allUsers);
+        }
+        logger.info("Group folder object_name: {} for migrated_id: {}", groupObjectName, groupMigratedId);
+
+        // Step 2: Find all subletter r_object_ids whose group_id matches this group folder
+        List<String> subletterMigratedIds = getSubletterMigratedIds(groupObjectName);
+        logger.info("Found {} subletters for group folder {}: {}", subletterMigratedIds.size(), groupObjectName, subletterMigratedIds);
+
+        // Step 3: Collect workflow users from each subletter
+        for (String subletterMigratedId : subletterMigratedIds) {
+            List<String> subletterUsers = readWorkflowUsersFromCsv(subletterMigratedId);
+            allUsers.addAll(subletterUsers);
+            if (!subletterUsers.isEmpty()) {
+                logger.debug("Collected {} workflow users from subletter {}: {}",
+                           subletterUsers.size(), subletterMigratedId, subletterUsers);
+            }
+        }
+
+        logger.info("Total unique workflow users collected from {} subletters: {}",
+                    subletterMigratedIds.size(), allUsers.size());
+        return new java.util.ArrayList<>(allUsers);
+    }
+
+    /**
+     * Get object_name for a given migrated_id (r_object_id) from a CSV file
+     */
+    private String getObjectNameByMigratedId(String migratedId, String csvFileName) {
+        File csvFile = new File(config.getDataExportPath() + "/" + csvFileName);
+        if (!csvFile.exists()) {
+            return null;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return null;
+            }
+
+            int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
+            int objectNameIndex = findColumnIndex(headers, "object_name");
+            if (rObjectIdIndex < 0 || objectNameIndex < 0) {
+                csvReader.close();
+                return null;
+            }
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                if (row.length > Math.max(rObjectIdIndex, objectNameIndex)) {
+                    if (migratedId.equals(row[rObjectIdIndex].trim())) {
+                        String objectName = row[objectNameIndex].trim();
+                        csvReader.close();
+                        return objectName;
+                    }
+                }
+            }
+            csvReader.close();
+        } catch (Exception e) {
+            logger.warn("Error reading object_name from {}: {}", csvFileName, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Get all subletter r_object_ids whose group_id matches the given group object_name
+     */
+    private List<String> getSubletterMigratedIds(String groupObjectName) {
+        List<String> migratedIds = new java.util.ArrayList<>();
+        File csvFile = new File(config.getDataExportPath() + "/DigidakSubletterRecords_Export.csv");
+        if (!csvFile.exists()) {
+            return migratedIds;
+        }
+
+        // Normalize group object name for comparison (e.g., "G65-2024-25" matches "G65/2024-25")
+        String normalizedGroupName = groupObjectName.replace("/", "-");
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+            String[] headers = csvReader.readNext();
+            if (headers == null) {
+                csvReader.close();
+                return migratedIds;
+            }
+
+            int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
+            int groupIdIndex = findColumnIndex(headers, "group_id");
+            if (rObjectIdIndex < 0 || groupIdIndex < 0) {
+                csvReader.close();
+                return migratedIds;
+            }
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                if (row.length > Math.max(rObjectIdIndex, groupIdIndex)) {
+                    String groupId = row[groupIdIndex].trim().replace("/", "-");
+                    if (normalizedGroupName.equals(groupId)) {
+                        String subletterMigratedId = row[rObjectIdIndex].trim();
+                        if (!subletterMigratedId.isEmpty()) {
+                            migratedIds.add(subletterMigratedId);
+                        }
+                    }
+                }
+            }
+            csvReader.close();
+        } catch (Exception e) {
+            logger.warn("Error reading subletter migrated IDs: {}", e.getMessage());
+        }
+        return migratedIds;
     }
 
     /**

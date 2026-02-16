@@ -27,6 +27,7 @@ public class AclService {
     // DFC Permission constants
     private static final int DF_PERMIT_READ = 3;
     private static final String ACL_NAME_PREFIX = "acl_digidak_";
+    private static final String ACL_NAME_PREFIX_GROUP = "acl_digidakG_";
 
     private RealFolderRepository folderRepository;
     private RealDocumentRepository documentRepository;
@@ -42,44 +43,60 @@ public class AclService {
     }
 
     /**
-     * Create custom ACL for folder with workflow users
+     * Create custom ACL for folder with workflow users AND apply it to the folder
+     * in a SINGLE session to avoid stale object / version conflict issues.
      *
      * @param folderId Documentum folder ID
      * @param migratedId Original r_object_id (for ACL naming)
      * @param userLogins List of user login names to grant READ permission
+     * @param isGroupFolder If true, uses acl_digidakG_ prefix instead of acl_digidak_
      * @return ACL object ID
      */
     public String createWorkflowUserAcl(String folderId, String migratedId,
-                                       List<String> userLogins) throws Exception {
-        System.out.println("=== ACL SERVICE === createWorkflowUserAcl called with folderId: " + folderId + ", migratedId: " + migratedId + ", users: " + userLogins);
-        logger.info("=== ACL SERVICE === createWorkflowUserAcl called with folderId: {}, migratedId: {}, users: {}",
-                   folderId, migratedId, userLogins);
+                                       List<String> userLogins, boolean isGroupFolder) throws Exception {
+        System.out.println("=== ACL SERVICE === createWorkflowUserAcl called with folderId: " + folderId + ", migratedId: " + migratedId + ", isGroupFolder: " + isGroupFolder + ", users: " + userLogins);
+        logger.info("=== ACL SERVICE === createWorkflowUserAcl called with folderId: {}, migratedId: {}, isGroupFolder: {}, users: {}",
+                   folderId, migratedId, isGroupFolder, userLogins);
 
-        if (userLogins == null || userLogins.isEmpty()) {
-            System.out.println("=== ACL SERVICE === No users provided for ACL creation for folder: " + folderId);
-            logger.warn("=== ACL SERVICE === No users provided for ACL creation for folder: {}", folderId);
-            return null;
+        if (userLogins == null) {
+            userLogins = new java.util.ArrayList<>();
         }
+        logger.info("=== ACL SERVICE === Creating custom ACL for folder: {} with {} workflow users", folderId, userLogins.size());
 
         IDfSession session = sessionManager.getSession();
         try {
-            // Get folder to clone its existing ACL
+            // Step 1: Get folder and refresh it to get latest state after repeating attribute saves
             IDfFolder folder = (IDfFolder) session.getObject(new DfId(folderId));
             if (folder == null) {
                 throw new Exception("Folder not found: " + folderId);
             }
-            System.out.println("=== ACL SERVICE === Retrieved folder object: " + folder.getObjectName());
-            logger.info("=== ACL SERVICE === Retrieved folder object: {}", folder.getObjectName());
+            folder.fetch(null); // CRITICAL: refresh folder to get latest state after setRepeatingAttribute saves
+            System.out.println("=== ACL SERVICE === Retrieved and refreshed folder object: " + folder.getObjectName());
+            logger.info("=== ACL SERVICE === Retrieved and refreshed folder object: {}", folder.getObjectName());
 
-            // Get existing ACL as template
-            IDfACL existingAcl = folder.getACL();
-            String aclDomain = existingAcl.getDomain();
-            System.out.println("=== ACL SERVICE === Existing ACL: " + existingAcl.getObjectName() + ", domain: " + aclDomain);
-            logger.info("=== ACL SERVICE === Existing ACL: {}, domain: {}",
-                       existingAcl.getObjectName(), aclDomain);
+            // Step 2: Capture base permissions from folder's current ACL BEFORE any modifications
+            IDfACL folderAcl = folder.getACL();
+            String aclDomain = folderAcl.getDomain();
+            String folderAclName = folderAcl.getObjectName();
+            System.out.println("=== ACL SERVICE === Existing ACL: " + folderAclName + ", domain: " + aclDomain);
+            logger.info("=== ACL SERVICE === Existing ACL: {}, domain: {}", folderAclName, aclDomain);
 
-            // Check if ACL with this name already exists (from a previous run)
-            String aclName = ACL_NAME_PREFIX + migratedId;
+            java.util.List<String[]> basePermissions = new java.util.ArrayList<>();
+            int baseCount = folderAcl.getAccessorCount();
+            for (int i = 0; i < baseCount; i++) {
+                String accessorName = folderAcl.getAccessorName(i);
+                int permitLevel = folderAcl.getAccessorPermit(i);
+                // Only copy system/admin base permissions, skip regular users like "Shaji K V"
+                if (accessorName.startsWith("dm_") ||
+                    accessorName.equals("docu") ||
+                    accessorName.contains("admin")) {
+                    basePermissions.add(new String[]{accessorName, String.valueOf(permitLevel)});
+                }
+            }
+            logger.info("=== ACL SERVICE === Captured {} base permissions from folder ACL", basePermissions.size());
+
+            // Step 3: Create or find existing ACL
+            String aclName = (isGroupFolder ? ACL_NAME_PREFIX_GROUP : ACL_NAME_PREFIX) + migratedId;
             IDfACL newAcl = findExistingAcl(session, aclName, aclDomain);
 
             if (newAcl != null) {
@@ -87,7 +104,11 @@ public class AclService {
                 logger.info("=== ACL SERVICE === Found existing ACL '{}', will update it", aclName);
                 int existingCount = newAcl.getAccessorCount();
                 for (int i = existingCount - 1; i >= 0; i--) {
-                    newAcl.revoke(newAcl.getAccessorName(i), "");
+                    try {
+                        newAcl.revoke(newAcl.getAccessorName(i), "");
+                    } catch (Exception e) {
+                        logger.warn("=== ACL SERVICE === Failed to revoke accessor at index {}: {}", i, e.getMessage());
+                    }
                 }
             } else {
                 // Create new ACL
@@ -98,57 +119,130 @@ public class AclService {
                 newAcl.setDescription("Workflow users ACL for migrated folder " + migratedId);
             }
 
-            // Copy base permissions from existing folder ACL (dm_owner, dm_world, etc.)
-            logger.info("=== ACL SERVICE === Copying base permissions from existing ACL");
-            copyBasePermissions(existingAcl, newAcl, session);
-
-            // Add workflow users with READ permission
-            int addedUsers = 0;
-            for (String userLogin : userLogins) {
+            // Step 4: Apply base permissions
+            logger.info("=== ACL SERVICE === Applying {} base permissions to new ACL", basePermissions.size());
+            for (String[] perm : basePermissions) {
                 try {
-                    logger.info("=== ACL SERVICE === Granting READ permission to user: {}", userLogin);
-                    newAcl.grant(userLogin, DF_PERMIT_READ, "");
-                    addedUsers++;
-                    logger.info("=== ACL SERVICE === Successfully granted READ permission to user: {}", userLogin);
+                    newAcl.grant(perm[0], Integer.parseInt(perm[1]), "");
+                    logger.debug("=== ACL SERVICE === Granted base permission: {} (level: {})", perm[0], perm[1]);
                 } catch (Exception e) {
-                    logger.error("=== ACL SERVICE === EXCEPTION: Failed to add user '{}' to ACL: {}",
-                               userLogin, e.getMessage(), e);
+                    logger.warn("=== ACL SERVICE === Failed to grant base permission for {}: {}", perm[0], e.getMessage());
                 }
             }
 
-            logger.info("=== ACL SERVICE === Added {} out of {} users to ACL", addedUsers, userLogins.size());
+            // Step 5: Validate workflow users exist BEFORE granting to prevent ACL corruption
+            java.util.List<String> validUsers = new java.util.ArrayList<>();
+            for (String userLogin : userLogins) {
+                try {
+                    if (userExists(session, userLogin)) {
+                        validUsers.add(userLogin);
+                        logger.info("=== ACL SERVICE === User '{}' exists in Documentum", userLogin);
+                    } else {
+                        System.out.println("=== ACL SERVICE === WARNING: User '" + userLogin + "' NOT FOUND in Documentum, skipping");
+                        logger.warn("=== ACL SERVICE === User '{}' NOT FOUND in Documentum, skipping", userLogin);
+                    }
+                } catch (Exception e) {
+                    logger.warn("=== ACL SERVICE === Error checking user '{}': {}, will try granting anyway", userLogin, e.getMessage());
+                    validUsers.add(userLogin); // Include if check fails - let grant() decide
+                }
+            }
 
-            // Save ACL
+            // Step 6: Add validated workflow users with READ permission
+            int addedUsers = 0;
+            for (String userLogin : validUsers) {
+                try {
+                    newAcl.grant(userLogin, DF_PERMIT_READ, "");
+                    addedUsers++;
+                    logger.info("=== ACL SERVICE === Granted READ permission to user: {}", userLogin);
+                } catch (Exception e) {
+                    System.out.println("=== ACL SERVICE === FAILED to grant user '" + userLogin + "': " + e.getMessage());
+                    logger.error("=== ACL SERVICE === Failed to grant user '{}': {}", userLogin, e.getMessage());
+                }
+            }
+
+            logger.info("=== ACL SERVICE === Added {} out of {} users to ACL", addedUsers, validUsers.size());
+
+            // Step 7: Save ACL
             logger.info("=== ACL SERVICE === Saving ACL object...");
             newAcl.save();
             String aclId = newAcl.getObjectId().getId();
+            logger.info("=== ACL SERVICE === ACL saved with id: {}, name: {}", aclId, aclName);
 
-            // Verify ACL was saved correctly
-            logger.info("=== ACL SERVICE === Verifying saved ACL...");
-            newAcl.fetch(null); // Refresh ACL object
-            String savedAclName = newAcl.getObjectName();
-            int savedAccessorCount = newAcl.getAccessorCount();
+            // Step 8: Apply ACL to folder - try setACLDomain/setACLName first (more reliable),
+            // fall back to setACL(object) if that fails
+            logger.info("=== ACL SERVICE === Applying ACL '{}' to folder...", aclName);
+            boolean applied = false;
 
-            logger.info("=== ACL SERVICE === VERIFICATION: ACL saved with object_name='{}', {} total accessors",
-                       savedAclName, savedAccessorCount);
+            // Approach 1: setACLDomain + setACLName (bypasses DFC object cache issues)
+            try {
+                folder.fetch(null);
+                folder.setACLDomain(aclDomain);
+                folder.setACLName(aclName);
+                folder.save();
+                applied = true;
+                logger.info("=== ACL SERVICE === Applied ACL via setACLDomain/setACLName");
+            } catch (Exception e1) {
+                System.out.println("=== ACL SERVICE === setACLDomain/setACLName failed: " + e1.getMessage() + ", trying setACL(object)...");
+                logger.warn("=== ACL SERVICE === setACLDomain/setACLName failed: {}, trying setACL(object)...", e1.getMessage());
 
-            // Log all accessors in the saved ACL
-            logger.info("=== ACL SERVICE === Listing all accessors in saved ACL:");
-            for (int i = 0; i < savedAccessorCount; i++) {
-                String accessorName = newAcl.getAccessorName(i);
-                int permitLevel = newAcl.getAccessorPermit(i);
-                String accessorType = accessorName.startsWith("dm_") ? "SYSTEM" :
-                                     (accessorName.contains("admin") ? "ADMIN" : "USER");
-                logger.info("=== ACL SERVICE ===   [{}] {} - name='{}', permit={}",
-                           i, accessorType, accessorName, permitLevel);
+                // Approach 2: setACL(IDfACL) with fresh folder fetch
+                try {
+                    folder.fetch(null);
+                    folder.setACL(newAcl);
+                    folder.save();
+                    applied = true;
+                    logger.info("=== ACL SERVICE === Applied ACL via setACL(object)");
+                } catch (Exception e2) {
+                    System.out.println("=== ACL SERVICE === setACL(object) also failed: " + e2.getMessage() + ", trying DQL update...");
+                    logger.warn("=== ACL SERVICE === setACL(object) also failed: {}, trying DQL update...", e2.getMessage());
+
+                    // Approach 3: Direct DQL update as last resort
+                    try {
+                        String updateDql = "UPDATE dm_folder OBJECT "
+                                + "SET acl_domain = '" + aclDomain.replace("'", "''") + "', "
+                                + "acl_name = '" + aclName.replace("'", "''") + "' "
+                                + "WHERE r_object_id = '" + folderId + "'";
+                        IDfQuery updateQuery = new DfQuery();
+                        updateQuery.setDQL(updateDql);
+                        IDfCollection updateResult = updateQuery.execute(session, IDfQuery.DF_QUERY);
+                        if (updateResult != null) {
+                            updateResult.close();
+                        }
+                        applied = true;
+                        logger.info("=== ACL SERVICE === Applied ACL via DQL update");
+                    } catch (Exception e3) {
+                        System.out.println("=== ACL SERVICE === ALL 3 APPROACHES FAILED for folder " + folderId + ": " + e3.getMessage());
+                        logger.error("=== ACL SERVICE === ALL 3 APPROACHES FAILED for folder {}: approach1={}, approach2={}, approach3={}",
+                                   folderId, e1.getMessage(), e2.getMessage(), e3.getMessage());
+                    }
+                }
             }
 
-            logger.info("=== ACL SERVICE === SUCCESS: Created ACL {} (name='{}') with {} users for folder {}",
-                       aclId, savedAclName, addedUsers, folderId);
+            // Verify ACL was applied
+            if (applied) {
+                folder.fetch(null);
+                String appliedAclName = folder.getACLName();
+                if (aclName.equals(appliedAclName)) {
+                    System.out.println("=== ACL SERVICE === SUCCESS: Folder " + folder.getObjectName() + " acl_name is now: " + appliedAclName);
+                    logger.info("=== ACL SERVICE === VERIFICATION SUCCESS: Folder acl_name is now: {}", appliedAclName);
+                } else {
+                    System.out.println("=== ACL SERVICE === WARNING: Expected acl_name='" + aclName + "', but got '" + appliedAclName + "'");
+                    logger.error("=== ACL SERVICE === VERIFICATION FAILED: Expected acl_name='{}', but got '{}'",
+                                aclName, appliedAclName);
+                }
+            }
+
+            // Cache the ACL
+            aclCache.put(folderId, aclId);
+
+            logger.info("=== ACL SERVICE === Done: ACL {} (name='{}') with {} users for folder {}",
+                       aclId, aclName, addedUsers, folderId);
 
             return aclId;
 
         } catch (Exception e) {
+            System.out.println("=== ACL SERVICE === EXCEPTION in createWorkflowUserAcl for folder " + folderId + ": " + e.getMessage());
+            e.printStackTrace();
             logger.error("=== ACL SERVICE === EXCEPTION in createWorkflowUserAcl: {}", e.getMessage(), e);
             throw e;
         } finally {
@@ -157,7 +251,7 @@ public class AclService {
     }
 
     /**
-     * Apply ACL to folder
+     * Apply ACL to folder (standalone - used for other purposes)
      */
     public void applyAclToFolder(String folderId, String aclId) throws Exception {
         if (aclId == null || aclId.isEmpty()) {
@@ -173,78 +267,25 @@ public class AclService {
             if (folder == null) {
                 throw new Exception("Folder not found: " + folderId);
             }
-            logger.info("=== ACL SERVICE === Folder retrieved: {} (current acl_name: {})",
-                       folder.getObjectName(), folder.getACLName());
+            folder.fetch(null); // Refresh to get latest state
 
             IDfACL acl = (IDfACL) session.getObject(new DfId(aclId));
             if (acl == null) {
                 throw new Exception("ACL not found: " + aclId);
             }
-            logger.info("=== ACL SERVICE === ACL retrieved: {} (object_name: {})",
-                       aclId, acl.getObjectName());
 
-            // Log ACL accessor details before applying
-            int accessorCount = acl.getAccessorCount();
-            logger.info("=== ACL SERVICE === ACL has {} accessors before applying:", accessorCount);
-            for (int i = 0; i < accessorCount; i++) {
-                String accessorName = acl.getAccessorName(i);
-                int permitLevel = acl.getAccessorPermit(i);
-                logger.info("=== ACL SERVICE ===   Accessor {}: name='{}', permit={}",
-                           i, accessorName, permitLevel);
-            }
-
-            // Set ACL on folder
-            logger.info("=== ACL SERVICE === Calling folder.setACL()...");
             folder.setACL(acl);
-
-            logger.info("=== ACL SERVICE === Saving folder...");
             folder.save();
 
-            // Verify ACL was applied
-            logger.info("=== ACL SERVICE === Verifying ACL application...");
-            folder.fetch(null); // Refresh folder object
+            // Verify
+            folder.fetch(null);
             String appliedAclName = folder.getACLName();
-            String expectedAclName = acl.getObjectName();
+            logger.info("=== ACL SERVICE === Applied ACL to folder. acl_name is now: {}", appliedAclName);
 
-            if (expectedAclName.equals(appliedAclName)) {
-                logger.info("=== ACL SERVICE === VERIFICATION SUCCESS: Folder acl_name is now: {}", appliedAclName);
-            } else {
-                logger.error("=== ACL SERVICE === VERIFICATION FAILED: Expected acl_name='{}', but got '{}'",
-                            expectedAclName, appliedAclName);
-            }
-
-            // Cache the ACL
             aclCache.put(folderId, aclId);
-
-            logger.info("=== ACL SERVICE === Successfully applied ACL {} to folder {}", aclId, folderId);
 
         } finally {
             sessionManager.releaseSession(session);
-        }
-    }
-
-    /**
-     * Copy base permissions from source ACL (dm_owner, dm_world, administrators, etc.)
-     */
-    private void copyBasePermissions(IDfACL sourceAcl, IDfACL targetAcl,
-                                    IDfSession session) throws Exception {
-        int permitCount = sourceAcl.getAccessorCount();
-
-        for (int i = 0; i < permitCount; i++) {
-            String accessorName = sourceAcl.getAccessorName(i);
-            int permitLevel = sourceAcl.getAccessorPermit(i);
-            String extendedPermit = "";
-
-            // Copy system and base permits (dm_owner, dm_world, administrators, etc.)
-            // Skip regular users as we'll add workflow users separately
-            if (accessorName.startsWith("dm_") ||
-                accessorName.equals("docu") ||
-                accessorName.contains("admin")) {
-
-                targetAcl.grant(accessorName, permitLevel, extendedPermit);
-                logger.debug("Copied base permission for: {} (level: {})",
-                            accessorName, permitLevel);
-            }
         }
     }
 
@@ -299,12 +340,10 @@ public class AclService {
      * Get ACL ID for a folder
      */
     public String getFolderAcl(String folderId) throws Exception {
-        // Check cache first
         if (aclCache.containsKey(folderId)) {
             return aclCache.get(folderId);
         }
 
-        // Get from repository
         String aclId = folderRepository.getFolderAcl(folderId);
         if (aclId != null) {
             aclCache.put(folderId, aclId);
@@ -318,10 +357,7 @@ public class AclService {
      */
     public void applyAclToDocument(String documentId, String aclId) throws Exception {
         logger.debug("Applying ACL {} to document {}", aclId, documentId);
-
-        // In production: Use IDfSysobject.setACL()
         documentRepository.applyAcl(documentId, aclId);
-
         logger.debug("ACL applied successfully");
     }
 
@@ -339,14 +375,10 @@ public class AclService {
 
     /**
      * Create custom ACL
-     * In production, would create actual dm_acl object
      */
     public String createAcl(String aclName, String domain) throws Exception {
         logger.info("Creating ACL: {} in domain: {}", aclName, domain);
-
-        // Mock implementation
         String aclId = "45" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 14);
-
         logger.info("ACL created with ID: {}", aclId);
         return aclId;
     }
