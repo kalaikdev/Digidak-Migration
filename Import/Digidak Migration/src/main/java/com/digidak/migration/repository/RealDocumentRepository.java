@@ -88,10 +88,17 @@ public class RealDocumentRepository {
             // }
 
             // Set custom attributes if they exist in the object type
+            // Skip owner_name here - it will be set via DQL after save to avoid ACL domain issues
             if (metadata.getCustomAttributes() != null) {
                 for (Map.Entry<String, Object> entry : metadata.getCustomAttributes().entrySet()) {
                     String attrName = entry.getKey();
                     Object attrValue = entry.getValue();
+
+                    // Skip owner_name - setting it via DFC changes acl_domain and causes
+                    // DM_SYSOBJECT_E_INVALID_ACL_DOMAIN error. Will be set via DQL after save.
+                    if ("owner_name".equals(attrName)) {
+                        continue;
+                    }
 
                     try {
                         if (attrValue instanceof String) {
@@ -194,6 +201,13 @@ public class RealDocumentRepository {
      * Save document
      */
     public void save(String documentId) throws Exception {
+        save(documentId, null);
+    }
+
+    /**
+     * Save document with optional metadata for deferred owner_name setting
+     */
+    public void save(String documentId, DocumentMetadata metadata) throws Exception {
         IDfSession session = sessionManager.getSession();
         try {
             logger.debug("Saving document: {}", documentId);
@@ -211,8 +225,26 @@ public class RealDocumentRepository {
             }
 
             document.save();
-
             logger.debug("Document saved successfully: {}", document.getString("object_name"));
+
+            // Set owner_name via DQL after save to avoid ACL domain validation issues
+            String ownerName = null;
+            if (metadata != null && metadata.getCustomAttributes() != null) {
+                Object ownerVal = metadata.getCustomAttributes().get("owner_name");
+                if (ownerVal instanceof String) {
+                    ownerName = (String) ownerVal;
+                }
+            }
+            if (ownerName != null && !ownerName.trim().isEmpty()) {
+                String objectType = document.getString("r_object_type");
+                String dql = "UPDATE " + objectType + " OBJECTS SET owner_name = '" +
+                            ownerName.replace("'", "''") + "' WHERE r_object_id = '" + documentId + "'";
+                logger.debug("Setting owner_name via DQL: {}", dql);
+                com.documentum.fc.client.IDfQuery query = new com.documentum.fc.client.DfQuery();
+                query.setDQL(dql);
+                query.execute(session, com.documentum.fc.client.IDfQuery.DF_EXEC_QUERY);
+                logger.debug("owner_name set to '{}' via DQL for document: {}", ownerName, documentId);
+            }
         } finally {
             sessionManager.releaseSession(session);
         }

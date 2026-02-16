@@ -57,6 +57,7 @@ letter_subject to letter_subject
 completion_date to completed_date
 completion_date to received_date
 modified_from to performer
+modified_from to owner_name
 letter_category to type_category
 r_creator_name to r_creator_name
 send_to to assigned_user

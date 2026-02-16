@@ -161,6 +161,10 @@ public class MovementRegisterService {
                     if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
                         registerMetadata.addCustomAttribute("performer", values[modifiedFromIndex]);
                     }
+                    // modified_from -> owner_name
+                    if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
+                        registerMetadata.addCustomAttribute("owner_name", values[modifiedFromIndex]);
+                    }
                     // letter_category -> type_category
                     if (categoryIndex >= 0 && categoryIndex < values.length) {
                         registerMetadata.addCustomAttribute("type_category", values[categoryIndex]);
@@ -190,7 +194,7 @@ public class MovementRegisterService {
                         setRepeatingAssignedUsers(registerId, objectId); // objectId is set as migrated_id
                     }
 
-                    documentRepository.save(registerId);
+                    documentRepository.save(registerId, registerMetadata);
 
                     registerCount++;
                     result.incrementMovementRegisters();
