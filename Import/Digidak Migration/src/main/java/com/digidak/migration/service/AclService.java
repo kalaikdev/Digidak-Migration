@@ -393,8 +393,20 @@ public class AclService {
      * @return ACL object ID, or null on failure
      */
     public String applyExistingAcl(String folderId, String aclName, String workflowGroupName) throws Exception {
-        System.out.println("=== ACL SERVICE === applyExistingAcl called: folderId=" + folderId + ", aclName=" + aclName + ", workflowGroup=" + workflowGroupName);
-        logger.info("=== ACL SERVICE === applyExistingAcl: folderId={}, aclName={}, workflowGroup={}", folderId, aclName, workflowGroupName);
+        List<String> groups = new java.util.ArrayList<>();
+        if (workflowGroupName != null && !workflowGroupName.trim().isEmpty()) {
+            groups.add(workflowGroupName);
+        }
+        return applyExistingAcl(folderId, aclName, groups);
+    }
+
+    /**
+     * Apply a pre-existing ACL to a folder and grant READ permission to workflow groups.
+     * Supports multiple workflow group names (used for group folders with subletter groups).
+     */
+    public String applyExistingAcl(String folderId, String aclName, List<String> workflowGroupNames) throws Exception {
+        System.out.println("=== ACL SERVICE === applyExistingAcl called: folderId=" + folderId + ", aclName=" + aclName + ", workflowGroups=" + workflowGroupNames);
+        logger.info("=== ACL SERVICE === applyExistingAcl: folderId={}, aclName={}, workflowGroups={}", folderId, aclName, workflowGroupNames);
 
         IDfSession session = sessionManager.getSession();
         try {
@@ -418,7 +430,7 @@ public class AclService {
                 if (findResult.next()) {
                     String aclObjId = findResult.getString("r_object_id");
                     existingAcl = (IDfACL) session.getObject(new DfId(aclObjId));
-                    aclDomain = existingAcl.getDomain(); // Get domain from DFC object, not DQL
+                    aclDomain = existingAcl.getDomain();
                     System.out.println("=== ACL SERVICE === Found ACL: id=" + aclObjId + ", domain=" + aclDomain);
                 }
             } finally {
@@ -434,24 +446,23 @@ public class AclService {
             String aclId = existingAcl.getObjectId().getId();
             System.out.println("=== ACL SERVICE === Found existing ACL: id=" + aclId + ", domain=" + aclDomain);
 
-            // Step 3: Grant READ permission to workflow group if it exists
-            if (workflowGroupName != null && !workflowGroupName.trim().isEmpty()) {
-                // Check if the group/user exists in dm_user or dm_group
-                boolean groupExists = userExists(session, workflowGroupName);
+            // Step 3: Grant READ permission to each workflow group
+            for (String groupName : workflowGroupNames) {
+                if (groupName == null || groupName.trim().isEmpty()) continue;
+                boolean groupExists = userExists(session, groupName);
                 if (groupExists) {
                     try {
-                        existingAcl.grant(workflowGroupName, DF_PERMIT_READ, "");
-                        existingAcl.save();
-                        System.out.println("=== ACL SERVICE === Granted READ to '" + workflowGroupName + "' on ACL '" + aclName + "'");
-                        logger.info("=== ACL SERVICE === Granted READ to '{}' on ACL '{}'", workflowGroupName, aclName);
+                        existingAcl.grant(groupName, DF_PERMIT_READ, "");
+                        System.out.println("=== ACL SERVICE === Granted READ to '" + groupName + "' on ACL '" + aclName + "'");
                     } catch (Exception e) {
-                        System.out.println("=== ACL SERVICE === Failed to grant '" + workflowGroupName + "': " + e.getMessage());
-                        logger.warn("=== ACL SERVICE === Failed to grant '{}': {}", workflowGroupName, e.getMessage());
+                        System.out.println("=== ACL SERVICE === Failed to grant '" + groupName + "': " + e.getMessage());
                     }
                 } else {
-                    System.out.println("=== ACL SERVICE === WARNING: Group/user '" + workflowGroupName + "' does not exist in repository, skipping grant");
-                    logger.warn("=== ACL SERVICE === Group/user '{}' does not exist, skipping grant", workflowGroupName);
+                    System.out.println("=== ACL SERVICE === WARNING: Group/user '" + groupName + "' does not exist, skipping grant");
                 }
+            }
+            if (!workflowGroupNames.isEmpty()) {
+                existingAcl.save();
             }
 
             // Step 4: Apply ACL to folder using 3-tier fallback

@@ -758,6 +758,66 @@ public class FolderService {
 
             System.out.println("=== ACL DEBUG === login_office_type='" + loginOfficeType + "', login_region='" + loginRegion + "' for migrated_id: " + migratedId);
 
+            // Group folders (starts with "G"): collect subletter workflow_groups and apply as permissions
+            boolean isGroupFolder = isGroupFolder(migratedId);
+            if (isGroupFolder) {
+                System.out.println("=== ACL DEBUG === Group folder detected for migrated_id: " + migratedId);
+                List<String> subletterMigratedIds = getSubletterMigratedIds();
+                Set<String> allWorkflowGroups = new java.util.LinkedHashSet<>();
+                String groupAclName = null;
+
+                for (String subMigratedId : subletterMigratedIds) {
+                    String[] subOfficeRegion = readOfficeTypeAndRegion(subMigratedId);
+                    if (subOfficeRegion == null) continue;
+                    String subOfficeType = subOfficeRegion[0];
+                    String subRegion = subOfficeRegion[1];
+
+                    if ("HO".equalsIgnoreCase(subOfficeType)) {
+                        String wfGroup = "ecm_ho_" + subRegion.toLowerCase();
+                        allWorkflowGroups.add(wfGroup);
+                        if (groupAclName == null) groupAclName = "ecm_legacy_digidak_ho";
+                    } else if ("RO".equalsIgnoreCase(subOfficeType) || "TE".equalsIgnoreCase(subOfficeType)) {
+                        String sc = REGION_SHORT_CODE_MAP.get(subRegion.toLowerCase());
+                        if (sc != null) {
+                            String wfGroup = "ecm_legacy_digidak_" + sc;
+                            allWorkflowGroups.add(wfGroup);
+                            if (groupAclName == null) groupAclName = wfGroup;
+                        }
+                    }
+                }
+
+                System.out.println("=== ACL DEBUG === Group folder: collected " + allWorkflowGroups.size() + " unique workflow groups from subletters: " + allWorkflowGroups);
+
+                if (!allWorkflowGroups.isEmpty() && groupAclName != null) {
+                    List<String> groupsList = new java.util.ArrayList<>(allWorkflowGroups);
+
+                    // Update workflow_groups repeating attribute
+                    try {
+                        folderRepository.setRepeatingAttribute(folderId, "workflow_groups", groupsList);
+                        System.out.println("=== ACL DEBUG === Updated group folder workflow_groups to: " + groupsList);
+                    } catch (Exception wfEx) {
+                        System.out.println("=== ACL DEBUG === WARNING: Failed to update group folder workflow_groups: " + wfEx.getMessage());
+                        wfEx.printStackTrace();
+                    }
+
+                    // Apply ACL with all subletter workflow groups as permissions
+                    try {
+                        String aclId = aclService.applyExistingAcl(folderId, groupAclName, groupsList);
+                        if (aclId != null) {
+                            System.out.println("=== ACL DEBUG === SUCCESS: Group folder ACL '" + groupAclName + "' applied with ID: " + aclId);
+                        } else {
+                            System.out.println("=== ACL DEBUG === FAILED: Group folder ACL application returned null");
+                        }
+                    } catch (Exception aclEx) {
+                        System.out.println("=== ACL DEBUG === EXCEPTION applying group folder ACL: " + aclEx.getMessage());
+                        aclEx.printStackTrace();
+                    }
+                } else {
+                    System.out.println("=== ACL DEBUG === No workflow groups resolved for group folder, skipping ACL");
+                }
+                return;
+            }
+
             // HO folders: use pre-existing ACL ecm_legacy_digidak_ho
             if ("HO".equalsIgnoreCase(loginOfficeType)) {
                 String workflowGroupName = "ecm_ho_" + loginRegion.toLowerCase();
@@ -832,23 +892,15 @@ public class FolderService {
             }
 
             // Fallback: existing logic for folders without HO/RO/TE or unknown regions
-            boolean isGroupFolder = isGroupFolder(migratedId);
-            List<String> workflowUserNames;
-
-            if (isGroupFolder) {
-                workflowUserNames = collectSubletterWorkflowUsers(migratedId);
-                System.out.println("=== ACL DEBUG === Group folder detected. Collected " + workflowUserNames.size() + " workflow users from subletters: " + workflowUserNames);
-            } else {
-                workflowUserNames = readWorkflowUsersFromCsv(migratedId);
-                System.out.println("=== ACL DEBUG === Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
-            }
+            List<String> workflowUserNames = readWorkflowUsersFromCsv(migratedId);
+            System.out.println("=== ACL DEBUG === Fallback: Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
 
             if (workflowUserNames.isEmpty()) {
                 System.out.println("=== ACL DEBUG === No workflow users found for migrated_id: " + migratedId + ", will still create custom ACL");
             }
 
             System.out.println("=== ACL DEBUG === Creating and applying ACL for folder " + folderId + " with " + workflowUserNames.size() + " workflow users");
-            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames, isGroupFolder);
+            String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames, false);
 
             if (aclId != null) {
                 System.out.println("=== ACL DEBUG === SUCCESS: ACL created and applied with ID: " + aclId + " for folder: " + folderId);
