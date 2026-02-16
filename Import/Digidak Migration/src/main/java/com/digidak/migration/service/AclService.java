@@ -384,6 +384,144 @@ public class AclService {
     }
 
     /**
+     * Apply a pre-existing ACL to a folder and grant READ permission to a workflow group.
+     * Used for HO folders where ACL 'ecm_legacy_digidak_ho' already exists in the repository.
+     *
+     * @param folderId Documentum folder ID
+     * @param aclName Name of the existing ACL (e.g., "ecm_legacy_digidak_ho")
+     * @param workflowGroupName Group to grant READ permission (e.g., "ecm_ho_dit")
+     * @return ACL object ID, or null on failure
+     */
+    public String applyExistingAcl(String folderId, String aclName, String workflowGroupName) throws Exception {
+        System.out.println("=== ACL SERVICE === applyExistingAcl called: folderId=" + folderId + ", aclName=" + aclName + ", workflowGroup=" + workflowGroupName);
+        logger.info("=== ACL SERVICE === applyExistingAcl: folderId={}, aclName={}, workflowGroup={}", folderId, aclName, workflowGroupName);
+
+        IDfSession session = sessionManager.getSession();
+        try {
+            // Step 1: Get and refresh folder
+            IDfFolder folder = (IDfFolder) session.getObject(new DfId(folderId));
+            if (folder == null) {
+                throw new Exception("Folder not found: " + folderId);
+            }
+            folder.fetch(null);
+
+            // Step 2: Find the existing ACL by name (search without domain restriction)
+            String aclDomain = null;
+            IDfACL existingAcl = null;
+            String findDql = "SELECT r_object_id FROM dm_acl WHERE object_name = '"
+                            + aclName.replace("'", "''") + "'";
+            System.out.println("=== ACL SERVICE === Searching for ACL with DQL: " + findDql);
+            IDfQuery findQuery = new DfQuery();
+            findQuery.setDQL(findDql);
+            IDfCollection findResult = findQuery.execute(session, IDfQuery.DF_READ_QUERY);
+            try {
+                if (findResult.next()) {
+                    String aclObjId = findResult.getString("r_object_id");
+                    existingAcl = (IDfACL) session.getObject(new DfId(aclObjId));
+                    aclDomain = existingAcl.getDomain(); // Get domain from DFC object, not DQL
+                    System.out.println("=== ACL SERVICE === Found ACL: id=" + aclObjId + ", domain=" + aclDomain);
+                }
+            } finally {
+                findResult.close();
+            }
+
+            if (existingAcl == null) {
+                System.out.println("=== ACL SERVICE === ERROR: ACL '" + aclName + "' not found in repository!");
+                logger.error("=== ACL SERVICE === ACL '{}' not found in repository", aclName);
+                return null;
+            }
+
+            String aclId = existingAcl.getObjectId().getId();
+            System.out.println("=== ACL SERVICE === Found existing ACL: id=" + aclId + ", domain=" + aclDomain);
+
+            // Step 3: Grant READ permission to workflow group if it exists
+            if (workflowGroupName != null && !workflowGroupName.trim().isEmpty()) {
+                // Check if the group/user exists in dm_user or dm_group
+                boolean groupExists = userExists(session, workflowGroupName);
+                if (groupExists) {
+                    try {
+                        existingAcl.grant(workflowGroupName, DF_PERMIT_READ, "");
+                        existingAcl.save();
+                        System.out.println("=== ACL SERVICE === Granted READ to '" + workflowGroupName + "' on ACL '" + aclName + "'");
+                        logger.info("=== ACL SERVICE === Granted READ to '{}' on ACL '{}'", workflowGroupName, aclName);
+                    } catch (Exception e) {
+                        System.out.println("=== ACL SERVICE === Failed to grant '" + workflowGroupName + "': " + e.getMessage());
+                        logger.warn("=== ACL SERVICE === Failed to grant '{}': {}", workflowGroupName, e.getMessage());
+                    }
+                } else {
+                    System.out.println("=== ACL SERVICE === WARNING: Group/user '" + workflowGroupName + "' does not exist in repository, skipping grant");
+                    logger.warn("=== ACL SERVICE === Group/user '{}' does not exist, skipping grant", workflowGroupName);
+                }
+            }
+
+            // Step 4: Apply ACL to folder using 3-tier fallback
+            boolean applied = false;
+
+            // Approach 1: setACLDomain + setACLName
+            try {
+                folder.fetch(null);
+                folder.setACLDomain(aclDomain);
+                folder.setACLName(aclName);
+                folder.save();
+                applied = true;
+                System.out.println("=== ACL SERVICE === Applied existing ACL via setACLDomain/setACLName");
+            } catch (Exception e1) {
+                System.out.println("=== ACL SERVICE === setACLDomain/setACLName failed: " + e1.getMessage() + ", trying setACL(object)...");
+
+                // Approach 2: setACL(IDfACL)
+                try {
+                    folder.fetch(null);
+                    folder.setACL(existingAcl);
+                    folder.save();
+                    applied = true;
+                    System.out.println("=== ACL SERVICE === Applied existing ACL via setACL(object)");
+                } catch (Exception e2) {
+                    System.out.println("=== ACL SERVICE === setACL(object) failed: " + e2.getMessage() + ", trying DQL...");
+
+                    // Approach 3: DQL UPDATE
+                    try {
+                        String updateDql = "UPDATE dm_folder OBJECT "
+                                + "SET acl_domain = '" + aclDomain.replace("'", "''") + "', "
+                                + "acl_name = '" + aclName.replace("'", "''") + "' "
+                                + "WHERE r_object_id = '" + folderId + "'";
+                        IDfQuery updateQuery = new DfQuery();
+                        updateQuery.setDQL(updateDql);
+                        IDfCollection updateResult = updateQuery.execute(session, IDfQuery.DF_QUERY);
+                        if (updateResult != null) updateResult.close();
+                        applied = true;
+                        System.out.println("=== ACL SERVICE === Applied existing ACL via DQL update");
+                    } catch (Exception e3) {
+                        System.out.println("=== ACL SERVICE === ALL 3 APPROACHES FAILED for folder " + folderId);
+                        logger.error("=== ACL SERVICE === ALL 3 APPROACHES FAILED: {}, {}, {}", e1.getMessage(), e2.getMessage(), e3.getMessage());
+                    }
+                }
+            }
+
+            // Verify
+            if (applied) {
+                folder.fetch(null);
+                String appliedAclName = folder.getACLName();
+                if (aclName.equals(appliedAclName)) {
+                    System.out.println("=== ACL SERVICE === SUCCESS: Folder " + folder.getObjectName() + " acl_name is now: " + appliedAclName);
+                } else {
+                    System.out.println("=== ACL SERVICE === WARNING: Expected acl_name='" + aclName + "', but got '" + appliedAclName + "'");
+                }
+            }
+
+            aclCache.put(folderId, aclId);
+            return aclId;
+
+        } catch (Exception e) {
+            System.out.println("=== ACL SERVICE === EXCEPTION in applyExistingAcl for folder " + folderId + ": " + e.getMessage());
+            e.printStackTrace();
+            logger.error("=== ACL SERVICE === EXCEPTION in applyExistingAcl: {}", e.getMessage(), e);
+            throw e;
+        } finally {
+            sessionManager.releaseSession(session);
+        }
+    }
+
+    /**
      * Clear ACL cache
      */
     public void clearCache() {

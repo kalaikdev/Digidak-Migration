@@ -20,6 +20,46 @@ import java.util.stream.Stream;
 public class FolderService {
     private static final Logger logger = LogManager.getLogger(FolderService.class);
 
+    // Region to short_code mapping for RO/TE ACL names
+    private static final Map<String, String> REGION_SHORT_CODE_MAP = new HashMap<>();
+    static {
+        REGION_SHORT_CODE_MAP.put("andaman and nicobar", "an");
+        REGION_SHORT_CODE_MAP.put("andhra pradesh", "ad");
+        REGION_SHORT_CODE_MAP.put("arunachal pradesh", "ar");
+        REGION_SHORT_CODE_MAP.put("assam", "as");
+        REGION_SHORT_CODE_MAP.put("bihar", "br");
+        REGION_SHORT_CODE_MAP.put("bird kolkata", "bk");
+        REGION_SHORT_CODE_MAP.put("bird lucknow", "bl");
+        REGION_SHORT_CODE_MAP.put("bird mangalore", "bm");
+        REGION_SHORT_CODE_MAP.put("chhattisgarh", "ch");
+        REGION_SHORT_CODE_MAP.put("goa", "ga");
+        REGION_SHORT_CODE_MAP.put("gujarat", "gj");
+        REGION_SHORT_CODE_MAP.put("haryana", "hr");
+        REGION_SHORT_CODE_MAP.put("himachal pradesh", "hp");
+        REGION_SHORT_CODE_MAP.put("jammu and kashmir", "jk");
+        REGION_SHORT_CODE_MAP.put("jharkhand", "jh");
+        REGION_SHORT_CODE_MAP.put("karnataka", "ka");
+        REGION_SHORT_CODE_MAP.put("kerala", "kl");
+        REGION_SHORT_CODE_MAP.put("madhya pradesh", "mp");
+        REGION_SHORT_CODE_MAP.put("maharashtra", "mh");
+        REGION_SHORT_CODE_MAP.put("manipur", "mn");
+        REGION_SHORT_CODE_MAP.put("meghalaya", "ml");
+        REGION_SHORT_CODE_MAP.put("mizoram", "mz");
+        REGION_SHORT_CODE_MAP.put("nagaland", "nl");
+        REGION_SHORT_CODE_MAP.put("nbsc lucknow", "nc");
+        REGION_SHORT_CODE_MAP.put("new delhi", "dl");
+        REGION_SHORT_CODE_MAP.put("odisha", "or");
+        REGION_SHORT_CODE_MAP.put("punjab", "pn");
+        REGION_SHORT_CODE_MAP.put("rajasthan", "rj");
+        REGION_SHORT_CODE_MAP.put("sikkim", "sk");
+        REGION_SHORT_CODE_MAP.put("tamilnadu", "tn");
+        REGION_SHORT_CODE_MAP.put("telangana", "tg");
+        REGION_SHORT_CODE_MAP.put("tripura", "tr");
+        REGION_SHORT_CODE_MAP.put("uttar pradesh", "up");
+        REGION_SHORT_CODE_MAP.put("uttarakhand", "uk");
+        REGION_SHORT_CODE_MAP.put("west bengal", "wb");
+    }
+
     private RealFolderRepository folderRepository;
     private MigrationConfig config;
     private Map<String, String> folderIdMap; // Path -> ID mapping
@@ -711,41 +751,109 @@ public class FolderService {
                      folderId, migratedId);
 
         try {
-            // Check if this is a group folder by looking up the object_name
+            // Read login_office_type and login_region for this folder
+            String[] officeTypeAndRegion = readOfficeTypeAndRegion(migratedId);
+            String loginOfficeType = (officeTypeAndRegion != null) ? officeTypeAndRegion[0] : "";
+            String loginRegion = (officeTypeAndRegion != null) ? officeTypeAndRegion[1] : "";
+
+            System.out.println("=== ACL DEBUG === login_office_type='" + loginOfficeType + "', login_region='" + loginRegion + "' for migrated_id: " + migratedId);
+
+            // HO folders: use pre-existing ACL ecm_legacy_digidak_ho
+            if ("HO".equalsIgnoreCase(loginOfficeType)) {
+                String workflowGroupName = "ecm_ho_" + loginRegion.toLowerCase();
+                String aclName = "ecm_legacy_digidak_ho";
+
+                System.out.println("=== ACL DEBUG === HO folder detected. Using existing ACL '" + aclName + "' with workflow group '" + workflowGroupName + "'");
+                logger.info("=== ACL DEBUG === HO folder. ACL='{}', workflow_group='{}'", aclName, workflowGroupName);
+
+                // Update workflow_groups repeating attribute FIRST
+                try {
+                    List<String> workflowGroups = new java.util.ArrayList<>();
+                    workflowGroups.add(workflowGroupName);
+                    folderRepository.setRepeatingAttribute(folderId, "workflow_groups", workflowGroups);
+                    System.out.println("=== ACL DEBUG === Updated workflow_groups to: " + workflowGroups);
+                } catch (Exception wfEx) {
+                    System.out.println("=== ACL DEBUG === WARNING: Failed to update workflow_groups: " + wfEx.getMessage());
+                    wfEx.printStackTrace();
+                }
+
+                // Apply existing ACL and grant workflow group permission
+                try {
+                    String aclId = aclService.applyExistingAcl(folderId, aclName, workflowGroupName);
+                    if (aclId != null) {
+                        System.out.println("=== ACL DEBUG === SUCCESS: HO ACL applied with ID: " + aclId + " for folder: " + folderId);
+                    } else {
+                        System.out.println("=== ACL DEBUG === FAILED: HO ACL application returned null for folder: " + folderId);
+                    }
+                } catch (Exception aclEx) {
+                    System.out.println("=== ACL DEBUG === EXCEPTION applying HO ACL for folder " + folderId + ": " + aclEx.getMessage());
+                    aclEx.printStackTrace();
+                }
+                return;
+            }
+
+            // RO/TE folders: use pre-existing ACL ecm_legacy_digidak_<short_code>
+            if ("RO".equalsIgnoreCase(loginOfficeType) || "TE".equalsIgnoreCase(loginOfficeType)) {
+                String shortCode = REGION_SHORT_CODE_MAP.get(loginRegion.toLowerCase());
+                if (shortCode == null) {
+                    System.out.println("=== ACL DEBUG === WARNING: No short_code found for region '" + loginRegion + "', skipping RO/TE ACL");
+                    logger.warn("No short_code mapping for region: {}", loginRegion);
+                } else {
+                    String workflowGroupName = "ecm_legacy_digidak_" + shortCode;
+                    String aclName = "ecm_legacy_digidak_" + shortCode;
+
+                    System.out.println("=== ACL DEBUG === " + loginOfficeType + " folder detected. Using existing ACL '" + aclName + "' with workflow group '" + workflowGroupName + "'");
+
+                    // Update workflow_groups repeating attribute FIRST
+                    try {
+                        List<String> workflowGroups = new java.util.ArrayList<>();
+                        workflowGroups.add(workflowGroupName);
+                        folderRepository.setRepeatingAttribute(folderId, "workflow_groups", workflowGroups);
+                        System.out.println("=== ACL DEBUG === Updated workflow_groups to: " + workflowGroups);
+                    } catch (Exception wfEx) {
+                        System.out.println("=== ACL DEBUG === WARNING: Failed to update workflow_groups: " + wfEx.getMessage());
+                        wfEx.printStackTrace();
+                    }
+
+                    // Apply existing ACL and grant workflow group permission
+                    try {
+                        String aclId = aclService.applyExistingAcl(folderId, aclName, workflowGroupName);
+                        if (aclId != null) {
+                            System.out.println("=== ACL DEBUG === SUCCESS: " + loginOfficeType + " ACL applied with ID: " + aclId + " for folder: " + folderId);
+                        } else {
+                            System.out.println("=== ACL DEBUG === FAILED: " + loginOfficeType + " ACL application returned null for folder: " + folderId);
+                        }
+                    } catch (Exception aclEx) {
+                        System.out.println("=== ACL DEBUG === EXCEPTION applying " + loginOfficeType + " ACL for folder " + folderId + ": " + aclEx.getMessage());
+                        aclEx.printStackTrace();
+                    }
+                    return;
+                }
+            }
+
+            // Fallback: existing logic for folders without HO/RO/TE or unknown regions
             boolean isGroupFolder = isGroupFolder(migratedId);
             List<String> workflowUserNames;
 
             if (isGroupFolder) {
-                // For group folders, collect workflow users from all subletter children
                 workflowUserNames = collectSubletterWorkflowUsers(migratedId);
                 System.out.println("=== ACL DEBUG === Group folder detected. Collected " + workflowUserNames.size() + " workflow users from subletters: " + workflowUserNames);
-                logger.info("=== ACL DEBUG === Group folder detected. Collected {} workflow users from subletters: {}",
-                           workflowUserNames.size(), workflowUserNames);
             } else {
-                // For single/subletter folders, read workflow users directly
                 workflowUserNames = readWorkflowUsersFromCsv(migratedId);
                 System.out.println("=== ACL DEBUG === Read " + workflowUserNames.size() + " workflow user names from CSV: " + workflowUserNames);
-                logger.info("=== ACL DEBUG === Read {} workflow user names from CSV: {}",
-                           workflowUserNames.size(), workflowUserNames);
             }
 
             if (workflowUserNames.isEmpty()) {
                 System.out.println("=== ACL DEBUG === No workflow users found for migrated_id: " + migratedId + ", will still create custom ACL");
-                logger.info("=== ACL DEBUG === No workflow users found for migrated_id: {}, will still create custom ACL", migratedId);
             }
 
-            // Always create custom ACL (even with 0 workflow users) to replace default ACL
-            // createWorkflowUserAcl now also applies the ACL to folder in a single session
-            System.out.println("=== ACL DEBUG === Creating and applying ACL for folder " + folderId + " with " + workflowUserNames.size() + " workflow users: " + workflowUserNames);
-            logger.info("=== ACL DEBUG === Creating and applying ACL for folder {} with {} workflow users: {}", folderId, workflowUserNames.size(), workflowUserNames);
+            System.out.println("=== ACL DEBUG === Creating and applying ACL for folder " + folderId + " with " + workflowUserNames.size() + " workflow users");
             String aclId = aclService.createWorkflowUserAcl(folderId, migratedId, workflowUserNames, isGroupFolder);
 
             if (aclId != null) {
                 System.out.println("=== ACL DEBUG === SUCCESS: ACL created and applied with ID: " + aclId + " for folder: " + folderId);
-                logger.info("=== ACL DEBUG === SUCCESS: ACL created and applied with ID: {} for folder: {}", aclId, folderId);
             } else {
                 System.out.println("=== ACL DEBUG === FAILED: ACL creation returned null for folder: " + folderId);
-                logger.error("=== ACL DEBUG === FAILED: ACL creation returned null for folder: {}", folderId);
             }
 
         } catch (Exception e) {
@@ -753,7 +861,6 @@ public class FolderService {
             e.printStackTrace();
             logger.error("=== ACL DEBUG === EXCEPTION: Failed to apply workflow ACLs for folder {}: {}",
                         folderId, e.getMessage(), e);
-            e.printStackTrace();
             // Don't rethrow - let folder creation succeed even if ACL fails
         }
     }
@@ -967,6 +1074,50 @@ public class FolderService {
         }
 
         return users;
+    }
+
+    /**
+     * Read login_office_type (ho_ro_te) and login_region (from_dept_ro_te) from CSV for a given migratedId.
+     * Searches across Single, Group, and Subletter CSV files.
+     * Returns a String array: [login_office_type, login_region] or null if not found.
+     */
+    private String[] readOfficeTypeAndRegion(String migratedId) {
+        String[] csvFiles = {
+            "DigidakSingleRecords_Export.csv",
+            "DigidakGroupRecords_Export.csv",
+            "DigidakSubletterRecords_Export.csv"
+        };
+
+        for (String csvFileName : csvFiles) {
+            File csvFile = new File(config.getDataExportPath() + "/" + csvFileName);
+            if (!csvFile.exists()) continue;
+
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+                com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
+                String[] headers = csvReader.readNext();
+                if (headers == null) { csvReader.close(); continue; }
+
+                int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
+                int hoRoTeIndex = findColumnIndex(headers, "ho_ro_te");
+                int fromDeptRoTeIndex = findColumnIndex(headers, "from_dept_ro_te");
+
+                if (rObjectIdIndex < 0 || hoRoTeIndex < 0) { csvReader.close(); continue; }
+
+                String[] row;
+                while ((row = csvReader.readNext()) != null) {
+                    if (row.length > rObjectIdIndex && migratedId.equals(row[rObjectIdIndex].trim())) {
+                        String officeType = (hoRoTeIndex < row.length) ? row[hoRoTeIndex].trim() : "";
+                        String region = (fromDeptRoTeIndex >= 0 && fromDeptRoTeIndex < row.length) ? row[fromDeptRoTeIndex].trim() : "";
+                        csvReader.close();
+                        return new String[] { officeType, region };
+                    }
+                }
+                csvReader.close();
+            } catch (Exception e) {
+                logger.warn("Error reading office type from {}: {}", csvFileName, e.getMessage());
+            }
+        }
+        return null;
     }
 
     /**
