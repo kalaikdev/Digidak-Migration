@@ -70,8 +70,9 @@ public class RealSessionManager {
             System.setProperty("dfc.globalregistry.password", dfcConfig.getPassword());
         }
 
-        // Disable BOF if not needed
+        // Disable BOF to prevent dm_bof_registry from being used
         System.setProperty("dfc.bof.registry.connect.mode", "never");
+        System.setProperty("dfc.bof.registry.enabled", "false");
 
         // Set session defaults
         System.setProperty("dfc.session.secure_connect_default", "try_native_first");
@@ -104,6 +105,13 @@ public class RealSessionManager {
             loginInfo.setPassword(dfcConfig.getPassword());
 
             dfcSessionManager.setIdentity(dfcConfig.getRepositoryName(), loginInfo);
+
+            // Verify session user
+            IDfSession testSession = dfcSessionManager.getSession(dfcConfig.getRepositoryName());
+            String sessionUser = testSession.getLoginUserName();
+            System.out.println("[INIT] Connected as user: " + sessionUser);
+            logger.info("Connected as user: {}", sessionUser);
+            dfcSessionManager.release(testSession);
 
             logger.info("DFC initialized successfully");
             logger.info("Repository: {}", dfcConfig.getRepositoryName());

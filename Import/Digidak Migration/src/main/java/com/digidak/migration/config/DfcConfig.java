@@ -59,8 +59,11 @@ public class DfcConfig {
     }
 
     public String getRepositoryName() {
-        // Try direct repository name first, then global registry
+        // Try dfc.repository.name first, then dfc.repository, then global registry
         String repoName = dfcProperties.getProperty(REPOSITORY_NAME);
+        if (repoName == null || repoName.trim().isEmpty()) {
+            repoName = dfcProperties.getProperty("dfc.repository");
+        }
         if (repoName == null || repoName.trim().isEmpty()) {
             repoName = dfcProperties.getProperty(GLOBAL_REGISTRY_REPOSITORY);
         }

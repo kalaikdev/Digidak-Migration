@@ -1252,29 +1252,44 @@ public class FolderService {
     }
 
     /**
-     * Convert date from DD/MM/YYYY format to MM/DD/YYYY format
-     * Input: "22/04/2024, 12:00:00 AM" (DD/MM/YYYY)
-     * Output: "4/22/2024, 12:00:00 AM" (MM/DD/YYYY)
+     * Convert date to Documentum-compatible format.
+     * Handles multiple input formats:
+     *   - "01/05/2024, 4:58:37 PM" (dd/MM/yyyy)
+     *   - "4/22/2024, 12:00:00 am" (M/d/yyyy)
+     * Output: "MM/dd/yyyy hh:mm:ss" (Documentum format)
      */
     private String convertDateFormat(String dateStr) {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return dateStr;
         }
 
-        try {
-            // Parse DD/MM/YYYY format
-            SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a");
-            Date date = inputFormat.parse(dateStr.trim());
+        String trimmed = dateStr.trim();
+        SimpleDateFormat outputFormat = new SimpleDateFormat("MM/dd/yyyy hh:mm:ss a");
 
-            // Format as MM/DD/YYYY
-            SimpleDateFormat outputFormat = new SimpleDateFormat("M/d/yyyy, h:mm:ss a");
-            String converted = outputFormat.format(date);
-            logger.debug("Converted date from '{}' to '{}'", dateStr, converted);
-            return converted;
-        } catch (Exception e) {
-            logger.warn("Failed to convert date format for '{}': {}. Using original value.",
-                       dateStr, e.getMessage());
-            return dateStr;
+        // Try multiple input formats
+        String[] patterns = {
+            "M/d/yyyy, h:mm:ss a",
+            "dd/MM/yyyy, h:mm:ss a",
+            "M/d/yyyy, hh:mm:ss a",
+            "dd/MM/yyyy, hh:mm:ss a",
+            "MM/dd/yyyy, h:mm:ss a",
+            "yyyy-MM-dd HH:mm:ss"
+        };
+
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat inputFormat = new SimpleDateFormat(pattern);
+                inputFormat.setLenient(false);
+                Date date = inputFormat.parse(trimmed);
+                String converted = outputFormat.format(date);
+                logger.debug("Converted date '{}' using pattern '{}' to '{}'", trimmed, pattern, converted);
+                return converted;
+            } catch (Exception e) {
+                // Try next format
+            }
         }
+
+        logger.warn("Failed to convert date format for '{}'. Using original value.", trimmed);
+        return dateStr;
     }
 }
