@@ -115,7 +115,9 @@ public class DigidakExportOperation {
 
         String dql = baseDql;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
-            dql += " WHERE " + whereClause;
+            dql += " WHERE " + whereClause + " AND status !='Saved'";
+        } else {
+            dql += " WHERE status !='Saved'";
         }
 
         logger.info("Executing Query: " + dql);
@@ -559,7 +561,7 @@ public class DigidakExportOperation {
         // DQL for movement register from source: edmapp_letter_movement_reg
         // Use letter_number to link with uid_number from edmapp_letter_folder
         String movementDql = "SELECT r_object_id, object_name, modified_from, letter_subject, acl_name, status, letter_category, " +
-                "completion_date, letter_number " +
+                "completion_date, letter_number, r_creation_date " +
                 "FROM edmapp_letter_movement_reg " +
                 "WHERE letter_number='" + uidNumber + "'";
 
