@@ -323,7 +323,7 @@ public class DigidakExportOperation {
         // Export each repeating attribute for edmapp_letter_folder to its own CSV file
         String[] folderAttributes = {
             "office_type", "response_to_ioms_id", "endorse_object_id",
-            "cgm_and_assigned_groups", "vertical_users", "ddm_vertical_users"
+            "vertical_users", "ddm_vertical_users"
         };
 
         for (String attr : folderAttributes) {
@@ -335,9 +335,6 @@ public class DigidakExportOperation {
         // The link is: edmapp_letter_movement_reg.letter_number = edmapp_letter_folder.uid_number
         String movementWhereClause = "letter_number IN (SELECT uid_number FROM edmapp_letter_folder WHERE " + whereClause + ")";
         exportRepeatingAttribute(session, outputFilePath, movementWhereClause, "edmapp_letter_movement_reg", "send_to");
-
-        // Export workflow users based on cgm_and_assigned_groups
-        exportWorkflowUsers(session, outputFilePath, whereClause);
     }
 
     /**
@@ -414,128 +411,6 @@ public class DigidakExportOperation {
 
         } catch (DfException | IOException e) {
             logger.error("Error in exportRepeatingAttribute for " + attributeName, e);
-        } finally {
-            if (collection != null) {
-                try {
-                    collection.close();
-                } catch (DfException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    /**
-     * Exports workflow users based on cgm_and_assigned_groups attribute.
-     * Fetches all users from dm_group based on group_name values in cgm_and_assigned_groups.
-     * IMPROVED APPROACH: Fetch objects and iterate through repeating values programmatically
-     */
-    private void exportWorkflowUsers(IDfSession session, String outputBasePath, String whereClause) {
-        logger.info("Exporting workflow users based on cgm_and_assigned_groups...");
-
-        File mainExportDir = new File(outputBasePath);
-        if (!mainExportDir.exists()) {
-            mainExportDir.mkdirs();
-        }
-        File outputFile = new File(mainExportDir, "repeating_workflow_users.csv");
-
-        // Get all records (object IDs only)
-        String dql = "SELECT r_object_id FROM edmapp_letter_folder";
-        if (whereClause != null && !whereClause.trim().isEmpty()) {
-            dql += " WHERE " + whereClause;
-        }
-
-        logger.debug("Executing Query: " + dql);
-
-        IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
-            IDfQuery query = new DfQuery();
-            query.setDQL(dql);
-            collection = query.execute(session, IDfQuery.DF_READ_QUERY);
-
-            // Header: r_object_id, workflow_users
-            String[] headers = { "r_object_id", "workflow_users" };
-            writeLine(writer, headers);
-
-            int totalRows = 0;
-            int objectCount = 0;
-
-            while (collection.next()) {
-                String objectId = collection.getString("r_object_id");
-                objectCount++;
-
-                try {
-                    // Fetch the object to access cgm_and_assigned_groups repeating attribute
-                    IDfSysObject folderObj = (IDfSysObject) session.getObject(new DfId(objectId));
-
-                    // Get the count of groups assigned
-                    int groupCount = folderObj.getValueCount("cgm_and_assigned_groups");
-
-                    if (groupCount == 0) {
-                        logger.debug("Object " + objectId + " has no cgm_and_assigned_groups");
-                        continue;
-                    }
-
-                    // Iterate through each group name
-                    for (int i = 0; i < groupCount; i++) {
-                        String groupName = folderObj.getRepeatingString("cgm_and_assigned_groups", i);
-
-                        // Skip if no group name
-                        if (groupName == null || groupName.trim().isEmpty()) {
-                            continue;
-                        }
-
-                        // Query dm_group to get users_names for this group (object ID only)
-                        String groupDql = "SELECT r_object_id FROM dm_group WHERE group_name = '" + groupName.replace("'", "''") + "'";
-
-                        IDfCollection groupCollection = null;
-                        try {
-                            IDfQuery groupQuery = new DfQuery();
-                            groupQuery.setDQL(groupDql);
-                            groupCollection = groupQuery.execute(session, IDfQuery.DF_READ_QUERY);
-
-                            if (groupCollection.next()) {
-                                String groupObjectId = groupCollection.getString("r_object_id");
-
-                                // Fetch the group object to access users_names repeating attribute
-                                IDfSysObject groupObj = (IDfSysObject) session.getObject(new DfId(groupObjectId));
-                                int userCount = groupObj.getValueCount("users_names");
-
-                                // Iterate through each user in the group
-                                for (int j = 0; j < userCount; j++) {
-                                    String userName = groupObj.getRepeatingString("users_names", j);
-
-                                    if (userName != null && !userName.trim().isEmpty()) {
-                                        List<String> row = new ArrayList<>();
-                                        row.add(objectId);  // Correct folder r_object_id
-                                        row.add(userName);  // Individual user name
-                                        writeLine(writer, row.toArray(new String[0]));
-                                        totalRows++;
-                                    }
-                                }
-                            }
-                        } catch (DfException e) {
-                            logger.error("Error querying dm_group for group: " + groupName + ": " + e.getMessage());
-                        } finally {
-                            if (groupCollection != null) {
-                                try {
-                                    groupCollection.close();
-                                } catch (DfException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        }
-                    }
-
-                } catch (DfException e) {
-                    logger.error("Error processing object " + objectId + " for workflow users: " + e.getMessage());
-                }
-            }
-
-            logger.info("Exported " + totalRows + " workflow users from " + objectCount + " objects to " + outputFile.getName());
-
-        } catch (DfException | IOException e) {
-            logger.error("Error in exportWorkflowUsers", e);
         } finally {
             if (collection != null) {
                 try {
