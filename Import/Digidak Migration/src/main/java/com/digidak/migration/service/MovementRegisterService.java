@@ -122,6 +122,7 @@ public class MovementRegisterService {
             int statusIndex = findColumnIndex(headers, "status");
             int categoryIndex = findColumnIndex(headers, "letter_category");
             int completionDateIndex = findColumnIndex(headers, "completion_date");
+            int rCreationDateIndex = findColumnIndex(headers, "r_creation_date");
             int rCreatorNameIndex = findColumnIndex(headers, "r_creator_name");
             int letterNumberIndex = findColumnIndex(headers, "letter_number");
 
@@ -149,9 +150,9 @@ public class MovementRegisterService {
                     if (subjectIndex >= 0 && subjectIndex < values.length) {
                         registerMetadata.addCustomAttribute("letter_subject", values[subjectIndex]);
                     }
-                    // completion_date -> completed_date
-                    if (completionDateIndex >= 0 && completionDateIndex < values.length) {
-                        registerMetadata.addCustomAttribute("completed_date", values[completionDateIndex]);
+                    // r_creation_date -> completed_date
+                    if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
+                        registerMetadata.addCustomAttribute("completed_date", values[rCreationDateIndex]);
                     }
                     // completion_date -> received_date
                     if (completionDateIndex >= 0 && completionDateIndex < values.length) {

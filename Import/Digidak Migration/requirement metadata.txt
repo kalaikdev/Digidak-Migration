@@ -54,7 +54,7 @@ workflow_users to workflow_groups
 For cms_digidak_movement_re:
 status to status
 letter_subject to letter_subject 
-completion_date to completed_date
+r_creation_date to completed_date
 completion_date to received_date
 modified_from to performer
 modified_from to owner_name
@@ -70,6 +70,9 @@ object_name to object_name
 title to uid_number
 r_object_id to migrated_id
 and always set is_migrated=true
+
+
+
 
 
 
