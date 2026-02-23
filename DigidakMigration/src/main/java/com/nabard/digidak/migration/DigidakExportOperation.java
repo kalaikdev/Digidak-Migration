@@ -450,7 +450,7 @@ public class DigidakExportOperation {
 
             String[] headers = {
                     "r_object_id", "object_name", "modified_from", "letter_subject", "acl_name", "status", "letter_category",
-                    "completion_date", "letter_number"
+                    "completion_date", "letter_number", "r_creation_date"
             };
 
             writeLine(writer, headers);
