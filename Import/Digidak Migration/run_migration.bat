@@ -19,7 +19,7 @@ echo.
 
 REM Generate list of all .java source files for compilation
 dir /s /b src\main\java\com\digidak\migration\*.java > _sources.txt
-javac -cp "libs/*;." -d . @_sources.txt
+javac -encoding UTF-8 -cp "libs/*;." -d . @_sources.txt
 
 if %ERRORLEVEL% NEQ 0 (
     del _sources.txt 2>nul
