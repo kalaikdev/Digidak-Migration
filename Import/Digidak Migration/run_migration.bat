@@ -11,6 +11,13 @@ echo.
 REM Set working directory
 cd /d "%~dp0"
 
+REM DFC JVM arguments - must be set as -D flags before class loading
+set DFC_OPTS=--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED
+set DFC_OPTS=%DFC_OPTS% -Ddfc.properties.file=config/dfc.properties
+set DFC_OPTS=%DFC_OPTS% -Ddfc.bof.registry.enabled=false
+set DFC_OPTS=%DFC_OPTS% -Ddfc.bof.registry.connect.mode=never
+set DFC_OPTS=%DFC_OPTS% -Dlog4j2.configurationFile=config/log4j2.properties
+
 REM ============================================
 REM STEP 1: Compile All Source Files
 REM ============================================
@@ -55,7 +62,7 @@ REM ============================================
 echo [3/5] Executing Phase 1 - Creating Folder Structure...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase1Runner
+java %DFC_OPTS% -cp "libs/*;config;." Phase1Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 1 execution failed!
@@ -73,7 +80,7 @@ REM ============================================
 echo [4/5] Executing Phase 2 - Importing Documents...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase2Runner
+java %DFC_OPTS% -cp "libs/*;config;." Phase2Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 2 execution failed!
@@ -91,7 +98,7 @@ REM ============================================
 echo [5/5] Executing Phase 3 - Creating Movement Registers...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase3Runner
+java %DFC_OPTS% -cp "libs/*;config;." Phase3Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 3 execution failed!
@@ -112,11 +119,10 @@ echo MIGRATION COMPLETED SUCCESSFULLY!
 echo ============================================
 echo.
 echo All 3 phases executed successfully:
-echo   - Phase 1: Folder Structure (7 folders with 26 attributes each)
-echo   - Phase 2: Document Import (5 documents with 4 attributes each)
-echo   - Phase 3: Movement Registers (15 registers with 7 attributes each)
+echo   - Phase 1: Folder Structure
+echo   - Phase 2: Document Import
+echo   - Phase 3: Movement Registers
 echo.
-echo Total Objects Created: 27
 echo Repository: NABARDUAT
 echo Cabinet: /Digidak Legacy
 echo.
