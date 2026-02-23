@@ -51,7 +51,7 @@ REM ============================================
 echo [3/5] Executing Phase 1 - Creating Folder Structure...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -cp "libs/*;." Phase1Runner
+java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase1Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 1 execution failed!
@@ -69,7 +69,7 @@ REM ============================================
 echo [4/5] Executing Phase 2 - Importing Documents...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -cp "libs/*;." Phase2Runner
+java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase2Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 2 execution failed!
@@ -87,7 +87,7 @@ REM ============================================
 echo [5/5] Executing Phase 3 - Creating Movement Registers...
 echo.
 
-java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -cp "libs/*;." Phase3Runner
+java --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/sun.reflect=ALL-UNNAMED -Dlog4j2.configurationFile=config/log4j2.properties -cp "libs/*;config;." Phase3Runner
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Phase 3 execution failed!
