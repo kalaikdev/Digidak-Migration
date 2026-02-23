@@ -14,16 +14,20 @@ cd /d "%~dp0"
 REM ============================================
 REM STEP 1: Compile All Source Files
 REM ============================================
-echo [1/5] Compiling source files...
+echo [1/5] Compiling all source files...
 echo.
 
-javac -cp "libs/*;." -d . src/main/java/com/digidak/migration/util/*.java src/main/java/com/digidak/migration/model/*.java src/main/java/com/digidak/migration/config/*.java src/main/java/com/digidak/migration/repository/*.java src/main/java/com/digidak/migration/parser/*.java src/main/java/com/digidak/migration/service/*.java
+REM Generate list of all .java source files for compilation
+dir /s /b src\main\java\com\digidak\migration\*.java > _sources.txt
+javac -cp "libs/*;." -d . @_sources.txt
 
 if %ERRORLEVEL% NEQ 0 (
+    del _sources.txt 2>nul
     echo ERROR: Source compilation failed!
     pause
     exit /b 1
 )
+del _sources.txt 2>nul
 
 echo [OK] Source files compiled successfully
 echo.
