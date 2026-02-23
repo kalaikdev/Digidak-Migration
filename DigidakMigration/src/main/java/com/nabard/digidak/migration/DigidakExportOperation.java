@@ -111,7 +111,7 @@ public class DigidakExportOperation {
                 "sensitivity, region, ref_number, letter_no, financial_year, received_from, " +
                 "sub_type, category_external, subjects, category_type, bulk_letter, file_no, type_mode, ho_ro_te, " +
                 "from_dept_ro_te, letter_case_number, date_of_receipt, foward_group_id, inward_ref_number, " +
-                "assigned_cgm_group, due_date_action, endorse_group_id, is_ddm, vertical_head_group FROM edmapp_letter_folder";
+                "assigned_cgm_group, due_date_action, endorse_group_id, is_ddm, vertical_head_group, group_id FROM edmapp_letter_folder";
 
         String dql = baseDql;
         if (whereClause != null && !whereClause.trim().isEmpty()) {
@@ -146,7 +146,7 @@ public class DigidakExportOperation {
                     "letter_no", "financial_year", "received_from", "sub_type",
                     "category_external", "subjects", "category_type", "bulk_letter", "file_no", "type_mode",
                     "ho_ro_te", "from_dept_ro_te", "letter_case_number", "date_of_receipt", "foward_group_id",
-                    "inward_ref_number", "assigned_cgm_group", "due_date_action", "endorse_group_id", "vertical_head_group"
+                    "inward_ref_number", "assigned_cgm_group", "due_date_action", "endorse_group_id", "vertical_head_group", "group_id"
             };
 
             // Write Headers
