@@ -40,6 +40,7 @@ group_letter_id to is_group
 assigned_cgm_group to selected_cgm_group
 due_date_action to due_date
 is_ddm to is_ddm
+group_id to group_uid
 r_object_id to migrated_id
 and always set status=Closed and is_migrated=true
 
@@ -70,6 +71,8 @@ object_name to object_name
 title to uid_number
 r_object_id to migrated_id
 and always set is_migrated=true
+
+
 
 
 

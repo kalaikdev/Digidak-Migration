@@ -6,7 +6,15 @@ import com.digidak.migration.repository.RealFolderRepository;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.digidak.migration.repository.RealSessionManager;
+import com.documentum.fc.client.IDfSession;
+import com.documentum.fc.client.IDfQuery;
+import com.documentum.fc.client.IDfCollection;
+import com.documentum.fc.client.DfQuery;
+
 import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -65,6 +73,7 @@ public class FolderService {
     private Map<String, String> folderIdMap; // Path -> ID mapping
     private UserLookupService userLookupService;
     private AclService aclService;
+    private RealSessionManager sessionManager;
 
     public FolderService(RealFolderRepository folderRepository, MigrationConfig config,
                         UserLookupService userLookupService, AclService aclService) {
@@ -73,6 +82,17 @@ public class FolderService {
         this.folderIdMap = new HashMap<>();
         this.userLookupService = userLookupService;
         this.aclService = aclService;
+    }
+
+    public FolderService(RealFolderRepository folderRepository, MigrationConfig config,
+                        UserLookupService userLookupService, AclService aclService,
+                        RealSessionManager sessionManager) {
+        this.folderRepository = folderRepository;
+        this.config = config;
+        this.folderIdMap = new HashMap<>();
+        this.userLookupService = userLookupService;
+        this.aclService = aclService;
+        this.sessionManager = sessionManager;
     }
 
     /**
@@ -97,6 +117,9 @@ public class FolderService {
 
         // Step 5: Set metadata for all folders from CSV files
         setFolderMetadataFromCSV();
+
+        // Step 6: Update group folder login_region and letter_subject from subletter data
+        updateGroupFolderValuesFromSubletters();
 
         logger.info("Folder structure setup completed. Total folders created: {}",
                 folderIdMap.size());
@@ -521,6 +544,7 @@ public class FolderService {
             int assignedCgmGroupIndex = findColumnIndex(headers, "assigned_cgm_group");
             int dueDateActionIndex = findColumnIndex(headers, "due_date_action");
             int isDdmIndex = findColumnIndex(headers, "is_ddm");
+            int groupIdIndex = findColumnIndex(headers, "group_id");
             int rObjectIdIndex = findColumnIndex(headers, "r_object_id");
 
             // Read data rows
@@ -643,6 +667,9 @@ public class FolderService {
                         }
                         if (isDdmIndex >= 0 && isDdmIndex < values.length && !values[isDdmIndex].trim().isEmpty()) {
                             attributes.put("is_ddm", values[isDdmIndex].trim());
+                        }
+                        if (groupIdIndex >= 0 && groupIdIndex < values.length && !values[groupIdIndex].trim().isEmpty()) {
+                            attributes.put("group_uid", values[groupIdIndex].trim());
                         }
                         if (rObjectIdIndex >= 0 && rObjectIdIndex < values.length && !values[rObjectIdIndex].trim().isEmpty()) {
                             attributes.put("migrated_id", values[rObjectIdIndex].trim());
@@ -1291,5 +1318,121 @@ public class FolderService {
 
         logger.warn("Failed to convert date format for '{}'. Using original value.", trimmed);
         return dateStr;
+    }
+
+    /**
+     * Update group folder login_region and letter_subject from subletter data.
+     * 1. Query: SELECT DISTINCT group_uid, letter_subject, login_region FROM cms_digidak_folder WHERE group_uid != ''
+     * 2. Write results to update_group_folder_values.csv
+     * 3. For each row, normalize group_uid (G1/2024-25 -> G1-2024-25) and update the group folder
+     */
+    private void updateGroupFolderValuesFromSubletters() {
+        if (sessionManager == null) {
+            logger.warn("SessionManager not available, skipping group folder value update");
+            return;
+        }
+
+        logger.info("Updating group folder values (login_region, letter_subject) from subletter data...");
+
+        IDfSession session = null;
+        try {
+            session = sessionManager.getSession();
+
+            // Step 1: Query distinct group_uid, letter_subject, login_region
+            String dql = "SELECT DISTINCT group_uid, letter_subject, login_region FROM cms_digidak_folder WHERE group_uid != ''";
+            logger.info("Executing DQL: {}", dql);
+
+            IDfQuery query = new DfQuery();
+            query.setDQL(dql);
+            IDfCollection collection = query.execute(session, IDfQuery.DF_READ_QUERY);
+
+            // Collect results
+            List<String[]> results = new ArrayList<>();
+            while (collection.next()) {
+                String groupUid = collection.getString("group_uid");
+                String letterSubject = collection.getString("letter_subject");
+                String loginRegion = collection.getString("login_region");
+                results.add(new String[] { groupUid, letterSubject, loginRegion });
+            }
+            collection.close();
+
+            logger.info("Found {} distinct group_uid entries from subletter folders", results.size());
+
+            if (results.isEmpty()) {
+                logger.info("No group_uid values found, skipping group folder update");
+                return;
+            }
+
+            // Step 2: Write to update_group_folder_values.csv
+            String csvPath = config.getDataExportPath() + "/update_group_folder_values.csv";
+            try (PrintWriter writer = new PrintWriter(new FileWriter(csvPath))) {
+                writer.println("group_uid,letter_subject,login_region");
+                for (String[] row : results) {
+                    // Escape CSV values
+                    writer.println("\"" + row[0].replace("\"", "\"\"") + "\","
+                            + "\"" + row[1].replace("\"", "\"\"") + "\","
+                            + "\"" + row[2].replace("\"", "\"\"") + "\"");
+                }
+                logger.info("Written {} rows to {}", results.size(), csvPath);
+                System.out.println("[GROUP UPDATE] Written " + results.size() + " rows to " + csvPath);
+            }
+
+            // Step 3: Update group folders
+            int updatedCount = 0;
+            for (String[] row : results) {
+                String groupUid = row[0];
+                String letterSubject = row[1];
+                String loginRegion = row[2];
+
+                // Normalize group_uid: G1/2024-25 -> G1-2024-25
+                String normalizedGroupUid = groupUid.replace("/", "-");
+
+                // Find group folder by object_name
+                String cabinetName = config.getCabinetName();
+                String groupFolderPath = "/" + cabinetName + "/" + normalizedGroupUid;
+                String groupFolderId = folderIdMap.get(groupFolderPath);
+
+                if (groupFolderId == null) {
+                    logger.debug("Group folder not found for object_name: {} (path: {})",
+                                normalizedGroupUid, groupFolderPath);
+                    continue;
+                }
+
+                // Update login_region and letter_subject on the group folder
+                try {
+                    Map<String, Object> updateAttrs = new HashMap<>();
+                    if (loginRegion != null && !loginRegion.trim().isEmpty()) {
+                        updateAttrs.put("login_region", loginRegion.trim());
+                    }
+                    if (letterSubject != null && !letterSubject.trim().isEmpty()) {
+                        updateAttrs.put("letter_subject", letterSubject.trim());
+                    }
+
+                    if (!updateAttrs.isEmpty()) {
+                        folderRepository.setFolderMetadata(groupFolderId, updateAttrs);
+                        updatedCount++;
+                        logger.info("Updated group folder '{}': login_region='{}', letter_subject='{}'",
+                                   normalizedGroupUid, loginRegion, letterSubject);
+                        System.out.println("[GROUP UPDATE] Updated " + normalizedGroupUid +
+                                         ": login_region=" + loginRegion + ", letter_subject=" + letterSubject);
+                    }
+                } catch (Exception e) {
+                    logger.error("Error updating group folder '{}': {}", normalizedGroupUid, e.getMessage());
+                    System.out.println("[GROUP UPDATE] ERROR updating " + normalizedGroupUid + ": " + e.getMessage());
+                }
+            }
+
+            logger.info("Group folder update completed. Updated {} out of {} group folders",
+                        updatedCount, results.size());
+            System.out.println("[GROUP UPDATE] Completed. Updated " + updatedCount + " group folders");
+
+        } catch (Exception e) {
+            logger.error("Error updating group folder values: {}", e.getMessage(), e);
+            System.out.println("[GROUP UPDATE] ERROR: " + e.getMessage());
+        } finally {
+            if (session != null) {
+                sessionManager.releaseSession(session);
+            }
+        }
     }
 }

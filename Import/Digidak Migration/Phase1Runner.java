@@ -52,7 +52,7 @@ public class Phase1Runner {
             UserLookupService userLookupService = new UserLookupService(sessionManager);
             AclService aclService = new AclService(folderRepository, documentRepository, sessionManager);
             FolderService folderService = new FolderService(folderRepository, migrationConfig,
-                                                           userLookupService, aclService);
+                                                           userLookupService, aclService, sessionManager);
             System.out.println("[OK] Services initialized");
             System.out.println();
 
