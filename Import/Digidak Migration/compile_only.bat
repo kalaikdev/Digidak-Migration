@@ -13,7 +13,7 @@ cd /d "%~dp0"
 
 REM Compile source files
 echo [1/2] Compiling source files...
-dir /s /b src\main\java\com\digidak\migration\*.java > _sources.txt
+dir /s /b src\main\java\com\digidak\migration\util\*.java src\main\java\com\digidak\migration\model\*.java src\main\java\com\digidak\migration\config\*.java src\main\java\com\digidak\migration\repository\*.java src\main\java\com\digidak\migration\parser\*.java src\main\java\com\digidak\migration\service\*.java > _sources.txt
 javac -encoding UTF-8 -cp "libs/*;." -d . @_sources.txt
 
 if %ERRORLEVEL% NEQ 0 (
