@@ -56,6 +56,7 @@ For cms_digidak_movement_re:
 status to status
 letter_subject to letter_subject 
 r_creation_date to completed_date
+r_creation_date to r_creation_date
 completion_date to received_date
 modified_from to performer
 modified_from to owner_name

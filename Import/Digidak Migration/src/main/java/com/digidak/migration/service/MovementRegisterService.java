@@ -154,6 +154,10 @@ public class MovementRegisterService {
                     if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
                         registerMetadata.addCustomAttribute("completed_date", values[rCreationDateIndex]);
                     }
+                    // r_creation_date -> r_creation_date
+                    if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
+                        registerMetadata.addCustomAttribute("r_creation_date", values[rCreationDateIndex]);
+                    }
                     // completion_date -> received_date
                     if (completionDateIndex >= 0 && completionDateIndex < values.length) {
                         registerMetadata.addCustomAttribute("received_date", values[completionDateIndex]);
