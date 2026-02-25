@@ -144,7 +144,33 @@ public class RealDocumentRepository {
             document.setContentType(contentType);
 
             // Upload file content using DFC setFile method
-            document.setFile(contentFile.getAbsolutePath());
+            // DFC set_file attribute has a 255-byte UTF-8 limit, so if the file path is too long
+            // (common with Hindi/Unicode filenames), copy to a temp file with a short name
+            String filePath = contentFile.getAbsolutePath();
+            File fileToUpload = contentFile;
+            File tempFile = null;
+            if (filePath.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 255) {
+                String extension = "";
+                String name = contentFile.getName();
+                int dotIndex = name.lastIndexOf('.');
+                if (dotIndex >= 0) {
+                    extension = name.substring(dotIndex);
+                }
+                tempFile = File.createTempFile("digidak_import_", extension);
+                java.nio.file.Files.copy(contentFile.toPath(), tempFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                fileToUpload = tempFile;
+                logger.debug("Using temp file for content upload (original path too long): {}",
+                            tempFile.getAbsolutePath());
+            }
+
+            try {
+                document.setFile(fileToUpload.getAbsolutePath());
+            } finally {
+                if (tempFile != null) {
+                    tempFile.delete();
+                }
+            }
 
             logger.info("Content uploaded successfully for document: {} ({})",
                        documentId, contentFile.getName());
