@@ -13,9 +13,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -130,7 +132,7 @@ public class DigidakExportOperation {
         String outputFilePath = new File(baseDir, csvFileName).getAbsolutePath();
 
         IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFilePath), StandardCharsets.UTF_8))) {
 
             IDfQuery query = new DfQuery();
             query.setDQL(dql);
@@ -358,7 +360,7 @@ public class DigidakExportOperation {
         File outputFile = new File(mainExportDir, "repeating_" + attributeName + ".csv");
 
         IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8))) {
             IDfQuery query = new DfQuery();
             query.setDQL(dql);
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
@@ -443,7 +445,7 @@ public class DigidakExportOperation {
         File movementFile = new File(digidakFolder, "movement_register.csv");
 
         IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(movementFile))) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(movementFile), StandardCharsets.UTF_8))) {
             IDfQuery query = new DfQuery();
             query.setDQL(movementDql);
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
@@ -499,7 +501,7 @@ public class DigidakExportOperation {
         File docFile = new File(digidakFolder, "document_metadata.csv");
 
         IDfCollection collection = null;
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(docFile))) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(docFile), StandardCharsets.UTF_8))) {
             IDfQuery query = new DfQuery();
             query.setDQL(docDql);
             collection = query.execute(session, IDfQuery.DF_READ_QUERY);
