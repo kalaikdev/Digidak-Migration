@@ -103,7 +103,7 @@ public class MovementRegisterService {
 
         // Parse CSV and create one document per row
         int registerCount = 0;
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
             // Read header
@@ -333,7 +333,7 @@ public class MovementRegisterService {
 
         java.util.List<String> assignedUsers = new java.util.ArrayList<>();
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
             // Read header

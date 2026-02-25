@@ -8,8 +8,11 @@ import com.opencsv.CSVReaderBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +45,7 @@ public class SchemaParser {
                 .withQuoteChar('"')
                 .build();
 
-        try (CSVReader csvReader = new CSVReaderBuilder(new FileReader(schemaFilePath))
+        try (CSVReader csvReader = new CSVReaderBuilder(new InputStreamReader(Files.newInputStream(Paths.get(schemaFilePath)), StandardCharsets.UTF_8))
                 .withCSVParser(parser)
                 .withSkipLines(1) // Skip header
                 .build()) {

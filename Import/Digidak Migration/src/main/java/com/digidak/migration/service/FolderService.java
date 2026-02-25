@@ -293,7 +293,7 @@ public class FolderService {
             return null;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(exportCsv))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(exportCsv), java.nio.charset.StandardCharsets.UTF_8))) {
             // Use a simple CSV parser from opencsv
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
@@ -496,7 +496,7 @@ public class FolderService {
             return;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
             // Read header
@@ -953,7 +953,7 @@ public class FolderService {
             return false;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
             String[] headers = csvReader.readNext();
             if (headers == null) {
@@ -1018,7 +1018,7 @@ public class FolderService {
             return null;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
             String[] headers = csvReader.readNext();
             if (headers == null) {
@@ -1061,7 +1061,7 @@ public class FolderService {
             return migratedIds;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
             String[] headers = csvReader.readNext();
             if (headers == null) {
@@ -1107,7 +1107,7 @@ public class FolderService {
         }
 
         try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.FileReader(csvFile))) {
+                new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
             // Read header
@@ -1171,7 +1171,7 @@ public class FolderService {
             File csvFile = new File(config.getDataExportPath() + "/" + csvFileName);
             if (!csvFile.exists()) continue;
 
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
                 com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
                 String[] headers = csvReader.readNext();
                 if (headers == null) { csvReader.close(); continue; }
@@ -1216,7 +1216,7 @@ public class FolderService {
 
         java.util.List<String> values = new java.util.ArrayList<>();
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(csvFile))) {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(csvFile), java.nio.charset.StandardCharsets.UTF_8))) {
             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReader(reader);
 
             // Read header
@@ -1365,7 +1365,7 @@ public class FolderService {
 
             // Step 2: Write to update_group_folder_values.csv
             String csvPath = config.getDataExportPath() + "/update_group_folder_values.csv";
-            try (PrintWriter writer = new PrintWriter(new FileWriter(csvPath))) {
+            try (PrintWriter writer = new PrintWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(csvPath), java.nio.charset.StandardCharsets.UTF_8))) {
                 writer.println("group_uid,letter_subject,login_region");
                 for (String[] row : results) {
                     // Escape CSV values
