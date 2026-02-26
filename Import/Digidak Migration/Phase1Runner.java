@@ -7,6 +7,9 @@ import com.digidak.migration.service.FolderService;
 import com.digidak.migration.service.UserLookupService;
 import com.digidak.migration.service.AclService;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -14,101 +17,114 @@ import java.util.Set;
  * Runs ONLY Phase 1: Folder Structure Setup
  */
 public class Phase1Runner {
+    private static final Logger logger = LogManager.getLogger(Phase1Runner.class);
+
+    private static void log(String message) {
+        System.out.println(message);
+        logger.info(message);
+    }
+
+    private static void logError(String message) {
+        System.err.println(message);
+        logger.error(message);
+    }
+
     public static void main(String[] args) {
-        System.out.println("===========================================");
-        System.out.println("DigiDak Migration - PHASE 1 ONLY");
-        System.out.println("Folder Structure Setup");
-        System.out.println("===========================================");
-        System.out.println();
+        log("===========================================");
+        log("DigiDak Migration - PHASE 1 ONLY");
+        log("Folder Structure Setup");
+        log("===========================================");
+        log("");
 
         long startTime = System.currentTimeMillis();
 
         try {
             // Load configurations
-            System.out.println("[CONFIG] Loading configurations...");
+            log("[CONFIG] Loading configurations...");
             DfcConfig dfcConfig = new DfcConfig();
             MigrationConfig migrationConfig = new MigrationConfig();
 
-            System.out.println("[CONFIG] Repository: " + dfcConfig.getRepositoryName());
-            System.out.println("[CONFIG] Cabinet Name: " + migrationConfig.getCabinetName());
-            System.out.println("[CONFIG] Data Export Path: " + migrationConfig.getDataExportPath());
-            System.out.println();
+            log("[CONFIG] Repository: " + dfcConfig.getRepositoryName());
+            log("[CONFIG] Cabinet Name: " + migrationConfig.getCabinetName());
+            log("[CONFIG] Data Export Path: " + migrationConfig.getDataExportPath());
+            log("");
 
             // Initialize session manager
-            System.out.println("[INIT] Initializing session manager...");
+            log("[INIT] Initializing session manager...");
             RealSessionManager sessionManager = RealSessionManager.getInstance(dfcConfig);
-            System.out.println("[OK] Session manager initialized");
-            System.out.println();
+            log("[OK] Session manager initialized");
+            log("");
 
             // Initialize repositories
-            System.out.println("[INIT] Initializing repositories...");
+            log("[INIT] Initializing repositories...");
             RealFolderRepository folderRepository = new RealFolderRepository(sessionManager);
             RealDocumentRepository documentRepository = new RealDocumentRepository(sessionManager);
-            System.out.println("[OK] Repositories initialized");
-            System.out.println();
+            log("[OK] Repositories initialized");
+            log("");
 
             // Initialize services
-            System.out.println("[INIT] Initializing services...");
+            log("[INIT] Initializing services...");
             UserLookupService userLookupService = new UserLookupService(sessionManager);
             AclService aclService = new AclService(folderRepository, documentRepository, sessionManager);
             FolderService folderService = new FolderService(folderRepository, migrationConfig,
                                                            userLookupService, aclService, sessionManager);
-            System.out.println("[OK] Services initialized");
-            System.out.println();
+            log("[OK] Services initialized");
+            log("");
 
             // ===========================================
             // PHASE 1: Setup Folder Structure
             // ===========================================
-            System.out.println("===========================================");
-            System.out.println("EXECUTING PHASE 1: Setting Up Folder Structure");
-            System.out.println("===========================================");
-            System.out.println();
+            log("===========================================");
+            log("EXECUTING PHASE 1: Setting Up Folder Structure");
+            log("===========================================");
+            log("");
 
             long phase1Start = System.currentTimeMillis();
-            System.out.println("[PHASE 1] Creating folder structure...");
+            log("[PHASE 1] Creating folder structure...");
             folderService.setupFolderStructure();
             long phase1Duration = System.currentTimeMillis() - phase1Start;
 
-            System.out.println("[PHASE 1] Folder structure creation completed!");
-            System.out.println();
+            log("[PHASE 1] Folder structure creation completed!");
+            log("");
 
             // Show Phase 1 results
             Map<String, String> folderIds = folderService.getAllFolderIds();
-            System.out.println("===========================================");
-            System.out.println("PHASE 1 RESULTS");
-            System.out.println("===========================================");
-            System.out.println();
-            System.out.println("[SUMMARY] Total Folders Created: " + folderIds.size());
-            System.out.println("[SUMMARY] Duration: " + phase1Duration + " ms (" + (phase1Duration / 1000) + " seconds)");
-            System.out.println();
-            System.out.println("[FOLDERS] Folder Structure:");
+            log("===========================================");
+            log("PHASE 1 RESULTS");
+            log("===========================================");
+            log("");
+            log("[SUMMARY] Total Folders Created: " + folderIds.size());
+            log("[SUMMARY] Duration: " + phase1Duration + " ms (" + (phase1Duration / 1000) + " seconds)");
+            log("");
+            log("[FOLDERS] Folder Structure:");
             folderIds.forEach((path, id) ->
-                System.out.println("  [" + id + "] " + path));
-            System.out.println();
+                log("  [" + id + "] " + path));
+            log("");
 
             // Print ACL statistics
             printAclStatistics(userLookupService);
 
             // Cleanup
-            System.out.println("[CLEANUP] Cleaning up resources...");
+            log("[CLEANUP] Cleaning up resources...");
             sessionManager.shutdown();
-            System.out.println("[OK] Resources cleaned up");
-            System.out.println();
+            log("[OK] Resources cleaned up");
+            log("");
 
             // Final Summary
             long totalDuration = System.currentTimeMillis() - startTime;
-            System.out.println("===========================================");
-            System.out.println("PHASE 1 COMPLETED SUCCESSFULLY!");
-            System.out.println("===========================================");
-            System.out.println("[TIME] Total Duration: " + totalDuration + " ms (" + (totalDuration / 1000) + " seconds)");
-            System.out.println("[STATUS] Folder structure is ready for Phase 2 (Document Import)");
-            System.out.println("===========================================");
+            log("===========================================");
+            log("PHASE 1 COMPLETED SUCCESSFULLY!");
+            log("===========================================");
+            log("[TIME] Total Duration: " + totalDuration + " ms (" + (totalDuration / 1000) + " seconds)");
+            log("[STATUS] Folder structure is ready for Phase 2 (Document Import)");
+            log("===========================================");
 
         } catch (Exception e) {
-            System.err.println("===========================================");
-            System.err.println("PHASE 1 FAILED!");
-            System.err.println("===========================================");
-            System.err.println("[ERROR] " + e.getMessage());
+            logError("===========================================");
+            logError("PHASE 1 FAILED!");
+            logError("===========================================");
+            logError("[ERROR] " + e.getMessage());
+            logger.error("Phase 1 failed", e);
             e.printStackTrace();
             System.exit(1);
         }
@@ -118,26 +134,26 @@ public class Phase1Runner {
      * Print ACL and user resolution statistics
      */
     private static void printAclStatistics(UserLookupService userLookupService) {
-        System.out.println();
-        System.out.println("===========================================");
-        System.out.println("    ACL APPLICATION STATISTICS");
-        System.out.println("===========================================");
+        log("");
+        log("===========================================");
+        log("    ACL APPLICATION STATISTICS");
+        log("===========================================");
 
         Map<String, String> resolvedUsers = userLookupService.getUserLoginCache();
         Set<String> notFoundUsers = userLookupService.getNotFoundUsers();
 
-        System.out.println("[ACL] Users successfully resolved: " + resolvedUsers.size());
-        System.out.println("[ACL] Users not found in Documentum: " + notFoundUsers.size());
+        log("[ACL] Users successfully resolved: " + resolvedUsers.size());
+        log("[ACL] Users not found in Documentum: " + notFoundUsers.size());
 
         if (!notFoundUsers.isEmpty()) {
-            System.out.println();
-            System.out.println("[WARNING] Users not found (first 20):");
+            log("");
+            log("[WARNING] Users not found (first 20):");
             notFoundUsers.stream().limit(20).forEach(user ->
-                System.out.println("  - " + user)
+                log("  - " + user)
             );
         }
 
-        System.out.println("===========================================");
-        System.out.println();
+        log("===========================================");
+        log("");
     }
 }
