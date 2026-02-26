@@ -263,13 +263,30 @@ public class RealDocumentRepository {
             }
             if (ownerName != null && !ownerName.trim().isEmpty()) {
                 String objectType = document.getString("r_object_type");
-                String dql = "UPDATE " + objectType + " OBJECTS SET owner_name = '" +
-                            ownerName.replace("'", "''") + "' WHERE r_object_id = '" + documentId + "'";
-                logger.debug("Setting owner_name via DQL: {}", dql);
-                com.documentum.fc.client.IDfQuery query = new com.documentum.fc.client.DfQuery();
-                query.setDQL(dql);
-                query.execute(session, com.documentum.fc.client.IDfQuery.DF_EXEC_QUERY);
-                logger.debug("owner_name set to '{}' via DQL for document: {}", ownerName, documentId);
+                try {
+                    String dql = "UPDATE " + objectType + " OBJECTS SET owner_name = '" +
+                                ownerName.replace("'", "''") + "' WHERE r_object_id = '" + documentId + "'";
+                    logger.debug("Setting owner_name via DQL: {}", dql);
+                    com.documentum.fc.client.IDfQuery query = new com.documentum.fc.client.DfQuery();
+                    query.setDQL(dql);
+                    query.execute(session, com.documentum.fc.client.IDfQuery.DF_EXEC_QUERY);
+                    logger.debug("owner_name set to '{}' via DQL for document: {}", ownerName, documentId);
+                } catch (Exception ownerEx) {
+                    // User does not exist in repository - fall back to repository owner (session user)
+                    logger.warn("User '{}' not found in repository, using session user as owner for document: {}",
+                               ownerName, documentId);
+                    try {
+                        String sessionUser = session.getLoginUserName();
+                        String fallbackDql = "UPDATE " + objectType + " OBJECTS SET owner_name = '" +
+                                    sessionUser.replace("'", "''") + "' WHERE r_object_id = '" + documentId + "'";
+                        com.documentum.fc.client.IDfQuery fallbackQuery = new com.documentum.fc.client.DfQuery();
+                        fallbackQuery.setDQL(fallbackDql);
+                        fallbackQuery.execute(session, com.documentum.fc.client.IDfQuery.DF_EXEC_QUERY);
+                        logger.debug("owner_name set to session user '{}' for document: {}", sessionUser, documentId);
+                    } catch (Exception fallbackEx) {
+                        logger.warn("Failed to set fallback owner_name for document {}: {}", documentId, fallbackEx.getMessage());
+                    }
+                }
             }
         } finally {
             sessionManager.releaseSession(session);

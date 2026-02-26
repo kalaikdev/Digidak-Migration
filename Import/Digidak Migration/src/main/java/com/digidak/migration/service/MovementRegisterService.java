@@ -130,80 +130,87 @@ public class MovementRegisterService {
             String[] values;
             while ((values = csvReader.readNext()) != null) {
                 if (values.length > 0) {
-                    com.digidak.migration.model.DocumentMetadata registerMetadata =
-                            new com.digidak.migration.model.DocumentMetadata();
+                    try {
+                        com.digidak.migration.model.DocumentMetadata registerMetadata =
+                                new com.digidak.migration.model.DocumentMetadata();
 
-                    // Set basic metadata
-                    String objectId = getColumnValue(values, objectIdIndex);
-                    String objectName = getColumnValue(values, objectNameIndex);
+                        // Set basic metadata
+                        String objectId = getColumnValue(values, objectIdIndex);
+                        String objectName = getColumnValue(values, objectNameIndex);
 
-                    registerMetadata.setObjectName(objectName != null ? objectName : "Movement_Register_" + folderName);
-                    registerMetadata.setrObjectType("cms_digidak_movement_re");
-                    registerMetadata.setiFolderId(folderId);
+                        registerMetadata.setObjectName(objectName != null ? objectName : "Movement_Register_" + folderName);
+                        registerMetadata.setrObjectType("cms_digidak_movement_re");
+                        registerMetadata.setiFolderId(folderId);
 
-                    // Set custom attributes from CSV per updated requirements
-                    // status -> status
-                    if (statusIndex >= 0 && statusIndex < values.length) {
-                        registerMetadata.addCustomAttribute("status", values[statusIndex]);
-                    }
-                    // letter_subject -> letter_subject
-                    if (subjectIndex >= 0 && subjectIndex < values.length) {
-                        registerMetadata.addCustomAttribute("letter_subject", values[subjectIndex]);
-                    }
-                    // r_creation_date -> completed_date
-                    if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
-                        registerMetadata.addCustomAttribute("completed_date", values[rCreationDateIndex]);
-                    }
-                    // r_creation_date -> r_creation_date
-                    if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
-                        registerMetadata.addCustomAttribute("r_creation_date", values[rCreationDateIndex]);
-                    }
-                    // completion_date -> received_date
-                    if (completionDateIndex >= 0 && completionDateIndex < values.length) {
-                        registerMetadata.addCustomAttribute("received_date", values[completionDateIndex]);
-                    }
-                    // modified_from -> performer
-                    if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
-                        registerMetadata.addCustomAttribute("performer", values[modifiedFromIndex]);
-                    }
-                    // modified_from -> owner_name
-                    if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
-                        registerMetadata.addCustomAttribute("owner_name", values[modifiedFromIndex]);
-                    }
-                    // letter_category -> type_category
-                    if (categoryIndex >= 0 && categoryIndex < values.length) {
-                        registerMetadata.addCustomAttribute("type_category", values[categoryIndex]);
-                    }
-                    // r_creator_name -> r_creator_name
-                    if (rCreatorNameIndex >= 0 && rCreatorNameIndex < values.length) {
-                        registerMetadata.addCustomAttribute("r_creator_name", values[rCreatorNameIndex]);
-                    }
-                    // r_object_id -> migrated_id
-                    if (objectId != null && !objectId.isEmpty()) {
-                        registerMetadata.addCustomAttribute("migrated_id", objectId);
-                    }
-                    // Always set is_migrated = true
-                    registerMetadata.addCustomAttribute("is_migrated", true);
+                        // Set custom attributes from CSV per updated requirements
+                        // status -> status
+                        if (statusIndex >= 0 && statusIndex < values.length) {
+                            registerMetadata.addCustomAttribute("status", values[statusIndex]);
+                        }
+                        // letter_subject -> letter_subject
+                        if (subjectIndex >= 0 && subjectIndex < values.length) {
+                            registerMetadata.addCustomAttribute("letter_subject", values[subjectIndex]);
+                        }
+                        // r_creation_date -> completed_date
+                        if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
+                            registerMetadata.addCustomAttribute("completed_date", values[rCreationDateIndex]);
+                        }
+                        // r_creation_date -> r_creation_date
+                        if (rCreationDateIndex >= 0 && rCreationDateIndex < values.length) {
+                            registerMetadata.addCustomAttribute("r_creation_date", values[rCreationDateIndex]);
+                        }
+                        // completion_date -> received_date
+                        if (completionDateIndex >= 0 && completionDateIndex < values.length) {
+                            registerMetadata.addCustomAttribute("received_date", values[completionDateIndex]);
+                        }
+                        // modified_from -> performer
+                        if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
+                            registerMetadata.addCustomAttribute("performer", values[modifiedFromIndex]);
+                        }
+                        // modified_from -> owner_name
+                        if (modifiedFromIndex >= 0 && modifiedFromIndex < values.length) {
+                            registerMetadata.addCustomAttribute("owner_name", values[modifiedFromIndex]);
+                        }
+                        // letter_category -> type_category
+                        if (categoryIndex >= 0 && categoryIndex < values.length) {
+                            registerMetadata.addCustomAttribute("type_category", values[categoryIndex]);
+                        }
+                        // r_creator_name -> r_creator_name
+                        if (rCreatorNameIndex >= 0 && rCreatorNameIndex < values.length) {
+                            registerMetadata.addCustomAttribute("r_creator_name", values[rCreatorNameIndex]);
+                        }
+                        // r_object_id -> migrated_id
+                        if (objectId != null && !objectId.isEmpty()) {
+                            registerMetadata.addCustomAttribute("migrated_id", objectId);
+                        }
+                        // Always set is_migrated = true
+                        registerMetadata.addCustomAttribute("is_migrated", true);
 
-                    // Keep letter_number for reference
-                    if (letterNumberIndex >= 0 && letterNumberIndex < values.length) {
-                        registerMetadata.addCustomAttribute("letter_number", values[letterNumberIndex]);
+                        // Keep letter_number for reference
+                        if (letterNumberIndex >= 0 && letterNumberIndex < values.length) {
+                            registerMetadata.addCustomAttribute("letter_number", values[letterNumberIndex]);
+                        }
+
+                        // Create in repository
+                        String registerId = documentRepository.createDocument(registerMetadata, folderId);
+                        documentRepository.setMetadata(registerId, registerMetadata);
+
+                        // Set repeating assigned_user attribute from repeating_send_to.csv
+                        if (objectId != null && !objectId.isEmpty()) {
+                            setRepeatingAssignedUsers(registerId, objectId); // objectId is set as migrated_id
+                        }
+
+                        documentRepository.save(registerId, registerMetadata);
+
+                        registerCount++;
+                        result.incrementMovementRegisters();
+                        logger.debug("Movement register created: {} for folder: {}", objectName, folderName);
+                    } catch (Exception rowEx) {
+                        String rowObjectId = getColumnValue(values, objectIdIndex);
+                        logger.error("Error creating movement register for: {} - {}, continuing with next row",
+                                    rowObjectId, rowEx.getMessage());
+                        result.addError("Movement register row failed: " + rowObjectId + " - " + rowEx.getMessage());
                     }
-
-                    // Create in repository
-                    String registerId = documentRepository.createDocument(registerMetadata, folderId);
-                    documentRepository.setMetadata(registerId, registerMetadata);
-
-                    // Set repeating assigned_user attribute from repeating_send_to.csv
-                    if (objectId != null && !objectId.isEmpty()) {
-                        setRepeatingAssignedUsers(registerId, objectId); // objectId is set as migrated_id
-                    }
-
-                    documentRepository.save(registerId, registerMetadata);
-
-                    registerCount++;
-                    result.incrementMovementRegisters();
-                    logger.debug("Movement register created: {} for folder: {}", objectName, folderName);
                 }
             }
             csvReader.close();
