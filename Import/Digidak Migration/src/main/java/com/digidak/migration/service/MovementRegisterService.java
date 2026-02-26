@@ -186,11 +186,6 @@ public class MovementRegisterService {
                         // Always set is_migrated = true
                         registerMetadata.addCustomAttribute("is_migrated", true);
 
-                        // Keep letter_number for reference
-                        if (letterNumberIndex >= 0 && letterNumberIndex < values.length) {
-                            registerMetadata.addCustomAttribute("letter_number", values[letterNumberIndex]);
-                        }
-
                         // Create in repository
                         String registerId = documentRepository.createDocument(registerMetadata, folderId);
                         documentRepository.setMetadata(registerId, registerMetadata);
