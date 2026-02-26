@@ -384,12 +384,23 @@ public class AclService {
     }
 
     /**
-     * Apply a pre-existing ACL to a folder and grant READ permission to a workflow group.
-     * Used for HO folders where ACL 'ecm_legacy_digidak_ho' already exists in the repository.
+     * Apply a pre-existing ACL to a folder without adding any workflow group permissions.
+     * The ACL is assumed to be already pre-configured with all necessary permissions.
      *
      * @param folderId Documentum folder ID
-     * @param aclName Name of the existing ACL (e.g., "ecm_legacy_digidak_ho")
-     * @param workflowGroupName Group to grant READ permission (e.g., "ecm_ho_dit")
+     * @param aclName Name of the existing ACL (e.g., "ecm_legacy_digidak")
+     * @return ACL object ID, or null on failure
+     */
+    public String applyExistingAcl(String folderId, String aclName) throws Exception {
+        return applyExistingAcl(folderId, aclName, new java.util.ArrayList<>());
+    }
+
+    /**
+     * Apply a pre-existing ACL to a folder and grant READ permission to a workflow group.
+     *
+     * @param folderId Documentum folder ID
+     * @param aclName Name of the existing ACL
+     * @param workflowGroupName Group to grant READ permission
      * @return ACL object ID, or null on failure
      */
     public String applyExistingAcl(String folderId, String aclName, String workflowGroupName) throws Exception {
