@@ -139,8 +139,8 @@ public class RealDocumentRepository {
                 throw new Exception("Document not found: " + documentId);
             }
 
-            // Set content type
-            String contentType = getContentType(contentFile.getName());
+            // Set content type by looking up dm_format table
+            String contentType = getContentType(contentFile.getName(), session);
             document.setContentType(contentType);
 
             // Upload file content using DFC setFile method
@@ -314,18 +314,52 @@ public class RealDocumentRepository {
         }
     }
 
+    // Cache for format lookups to avoid repeated DQL queries
+    private final java.util.Map<String, String> formatCache = new java.util.HashMap<>();
+
     /**
-     * Get content type from file extension
+     * Get content type from file extension by querying dm_format table.
+     * Falls back to the file extension itself if no format is found.
      */
-    private String getContentType(String filename) {
-        if (filename.endsWith(".pdf")) {
-            return "pdf";
-        } else if (filename.endsWith(".doc") || filename.endsWith(".docx")) {
-            return "msword";
-        } else if (filename.endsWith(".xls") || filename.endsWith(".xlsx")) {
-            return "msexcel";
+    private String getContentType(String filename, IDfSession session) {
+        String extension = "";
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex >= 0 && dotIndex < filename.length() - 1) {
+            extension = filename.substring(dotIndex + 1).toLowerCase();
         }
-        return "unknown";
+        if (extension.isEmpty()) {
+            return "unknown";
+        }
+
+        // Check cache first
+        if (formatCache.containsKey(extension)) {
+            return formatCache.get(extension);
+        }
+
+        // Query dm_format table for the format name
+        try {
+            String dql = "SELECT name FROM dm_format WHERE dos_extension = '" + extension.replace("'", "''") + "'";
+            com.documentum.fc.client.IDfQuery query = new com.documentum.fc.client.DfQuery();
+            query.setDQL(dql);
+            com.documentum.fc.client.IDfCollection result = query.execute(session, com.documentum.fc.client.IDfQuery.DF_READ_QUERY);
+            try {
+                if (result.next()) {
+                    String formatName = result.getString("name");
+                    formatCache.put(extension, formatName);
+                    logger.debug("Resolved format for extension '{}': {}", extension, formatName);
+                    return formatName;
+                }
+            } finally {
+                result.close();
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to lookup format for extension '{}': {}", extension, e.getMessage());
+        }
+
+        // Fallback: use the extension itself as format name
+        logger.warn("No format found in dm_format for extension '{}', using extension as format name", extension);
+        formatCache.put(extension, extension);
+        return extension;
     }
 
     /**
