@@ -157,13 +157,21 @@ public class FolderService {
         if (folders != null) {
             for (File folder : folders) {
                 String folderName = folder.getName();
-                FolderInfo createdFolder = folderRepository.createFolder(
-                        folderName,
-                        cabinet.getFolderPath(),
-                        FolderInfo.FolderType.SINGLE_RECORD
-                );
-                folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
-                logger.info("Created single record folder: {}", folderName);
+                String folderPath = cabinet.getFolderPath() + "/" + folderName;
+
+                if (folderRepository.folderExists(folderPath)) {
+                    logger.info("Single record folder already exists: {}", folderName);
+                    FolderInfo existingFolder = folderRepository.getFolderByPath(folderPath);
+                    folderIdMap.put(existingFolder.getFolderPath(), existingFolder.getFolderId());
+                } else {
+                    FolderInfo createdFolder = folderRepository.createFolder(
+                            folderName,
+                            cabinet.getFolderPath(),
+                            FolderInfo.FolderType.SINGLE_RECORD
+                    );
+                    folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
+                    logger.info("Created single record folder: {}", folderName);
+                }
             }
         }
     }
@@ -186,13 +194,21 @@ public class FolderService {
         if (folders != null) {
             for (File folder : folders) {
                 String folderName = folder.getName();
-                FolderInfo createdFolder = folderRepository.createFolder(
-                        folderName,
-                        cabinet.getFolderPath(),
-                        FolderInfo.FolderType.GROUP_RECORD
-                );
-                folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
-                logger.info("Created group record folder: {}", folderName);
+                String folderPath = cabinet.getFolderPath() + "/" + folderName;
+
+                if (folderRepository.folderExists(folderPath)) {
+                    logger.info("Group record folder already exists: {}", folderName);
+                    FolderInfo existingFolder = folderRepository.getFolderByPath(folderPath);
+                    folderIdMap.put(existingFolder.getFolderPath(), existingFolder.getFolderId());
+                } else {
+                    FolderInfo createdFolder = folderRepository.createFolder(
+                            folderName,
+                            cabinet.getFolderPath(),
+                            FolderInfo.FolderType.GROUP_RECORD
+                    );
+                    folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
+                    logger.info("Created group record folder: {}", folderName);
+                }
             }
         }
     }
@@ -227,14 +243,23 @@ public class FolderService {
 
                 // Only create if parent group folder exists
                 if (folderRepository.folderExists(parentPath)) {
-                    FolderInfo createdFolder = folderRepository.createFolder(
-                            subletterName,
-                            parentPath,
-                            FolderInfo.FolderType.SUBLETTER_RECORD
-                    );
-                    folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
-                    logger.info("Created subletter folder: {} inside group folder: {}",
-                               subletterName, parentFolderName);
+                    String subletterPath = parentPath + "/" + subletterName;
+
+                    if (folderRepository.folderExists(subletterPath)) {
+                        logger.info("Subletter folder already exists: {} inside group folder: {}",
+                                   subletterName, parentFolderName);
+                        FolderInfo existingFolder = folderRepository.getFolderByPath(subletterPath);
+                        folderIdMap.put(existingFolder.getFolderPath(), existingFolder.getFolderId());
+                    } else {
+                        FolderInfo createdFolder = folderRepository.createFolder(
+                                subletterName,
+                                parentPath,
+                                FolderInfo.FolderType.SUBLETTER_RECORD
+                        );
+                        folderIdMap.put(createdFolder.getFolderPath(), createdFolder.getFolderId());
+                        logger.info("Created subletter folder: {} inside group folder: {}",
+                                   subletterName, parentFolderName);
+                    }
                 } else {
                     logger.warn("Parent group folder '{}' not found for subletter: {}",
                                parentFolderName, subletterName);
